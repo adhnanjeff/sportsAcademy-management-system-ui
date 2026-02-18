@@ -1,0 +1,210 @@
+<div class="student-list-page page-enter">
+  <div class="page-header animate-fade-in-up">
+    <div class="header-content">
+      <h1>Students</h1>
+      <p>Manage your students</p>
+    </div>
+    @if (canManageStudents()) {
+      <a routerLink="new" class="create-btn">
+        <i class="fa-solid fa-plus"></i>
+        <span class="btn-text">Add Student</span>
+      </a>
+    }
+  </div>
+
+  <!-- Filters -->
+  <div class="filters animate-fade-in-up stagger-1">
+    <div class="search-box">
+      <i class="fa-solid fa-search"></i>
+      <input
+        type="text"
+        placeholder="Search students..."
+        [value]="searchQuery()"
+        (input)="onSearch($event)"
+      />
+    </div>
+    <div class="filter-group">
+      <select class="filter-select" [value]="statusFilter()" (change)="onStatusFilter($event)">
+        <option value="all">All Status</option>
+        <option value="ACTIVE">Active</option>
+        <option value="INACTIVE">Inactive</option>
+      </select>
+      <select class="filter-select" [value]="skillFilter()" (change)="onSkillFilter($event)">
+        <option value="all">All Levels</option>
+        <option value="BEGINNER">Beginner</option>
+        <option value="INTERMEDIATE">Intermediate</option>
+        <option value="ADVANCED">Advanced</option>
+        <option value="PROFESSIONAL">Professional</option>
+      </select>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="table-wrapper animate-fade-in stagger-2">
+      <div class="students-table-skeleton">
+        <div class="students-table-skeleton-header">
+          <div class="skeleton skeleton-text sm" style="width: 72px;"></div>
+          <div class="skeleton skeleton-text sm" style="width: 64px;"></div>
+          <div class="skeleton skeleton-text sm" style="width: 48px;"></div>
+          <div class="skeleton skeleton-text sm" style="width: 74px;"></div>
+          <div class="skeleton skeleton-text sm" style="width: 52px;"></div>
+          <div class="skeleton skeleton-text sm" style="width: 62px;"></div>
+          <div class="skeleton skeleton-text sm" style="width: 54px;"></div>
+        </div>
+
+        @for (row of skeletonRows(); track row) {
+          <div class="students-table-skeleton-row">
+            <div class="skeleton-student-cell">
+              <div class="skeleton skeleton-circle student-avatar-placeholder"></div>
+              <div class="skeleton-student-lines">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text sm"></div>
+              </div>
+            </div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-badge"></div>
+            <div class="skeleton skeleton-badge small"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton-actions-placeholder">
+              <div class="skeleton skeleton-circle action-placeholder"></div>
+              <div class="skeleton skeleton-circle action-placeholder"></div>
+              <div class="skeleton skeleton-circle action-placeholder"></div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="table-wrapper animate-fade-in-up stagger-2">
+      <table class="students-table">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Contact</th>
+            <th>Batch</th>
+            <th>Skill Level</th>
+            <th>Status</th>
+            <th>Join Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody class="list-animate">
+          @for (student of paginatedStudents(); track student.id) {
+            <tr>
+              <td>
+                <div class="student-cell">
+                  <app-avatar [name]="student.firstName + ' ' + student.lastName" size="sm" />
+                  <div class="student-info">
+                    <span class="student-name">{{ student.firstName }} {{ student.lastName }}</span>
+                    <span class="student-phone">{{ student.phone || 'No phone' }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>{{ student.phone }}</td>
+              <td>
+                @if (student.batchName) {
+                  <a [routerLink]="['/dashboard/batches', student.batchId]" class="batch-link">
+                    {{ student.batchName }}
+                  </a>
+                } @else {
+                  <span class="not-assigned">Not Assigned</span>
+                }
+              </td>
+              <td>
+                <app-badge
+                  [text]="formatSkillLevel(student.skillLevel || '')"
+                  [variant]="getSkillBadgeVariant(student.skillLevel || '')"
+                  size="sm"
+                />
+              </td>
+              <td>
+                <app-badge
+                  [text]="student.status ?? 'INACTIVE'"
+                  [variant]="(student.status ?? 'INACTIVE') === 'ACTIVE' ? 'success' : 'warning'"
+                  size="sm"
+                />
+              </td>
+              <td>{{ (student.joinDate || student.createdAt) | date:'MMM d, y' }}</td>
+              <td>
+                <div class="actions">
+                  <a [routerLink]="[student.id]" class="action-btn" title="View">
+                    <i class="fa-solid fa-eye"></i>
+                  </a>
+                  @if (canManageStudents()) {
+                    <a [routerLink]="[student.id, 'edit']" class="action-btn" title="Edit">
+                      <i class="fa-solid fa-pen"></i>
+                    </a>
+                    <button class="action-btn danger" title="Delete" (click)="confirmDelete(student)">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="empty-row">
+                <div class="empty-table-state">
+                  <div class="empty-illustration-small">
+                    <i class="fa-solid fa-user-plus"></i>
+                  </div>
+                  <h4>No students found</h4>
+                  <p>Try adjusting your filters or add a new student</p>
+                  @if (canManageStudents()) {
+                    <a routerLink="new" class="create-btn primary small">
+                      <i class="fa-solid fa-plus"></i>
+                      Add Student
+                    </a>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalRecords() > 0) {
+      <div class="table-footer animate-fade-in-up">
+        <div class="records-summary">
+          Showing {{ startRecord() }} - {{ endRecord() }} of {{ totalRecords() }} records
+        </div>
+
+        <div class="pagination-controls">
+          <div class="page-size-control">
+            <label for="pageSize">Rows per page</label>
+            <select id="pageSize" [value]="pageSize()" (change)="onPageSizeChange($event)">
+              @for (size of pageSizeOptions; track size) {
+                <option [value]="size">{{ size }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="page-nav">
+            <button type="button" class="page-btn" (click)="previousPage()" [disabled]="activePage() === 1">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <span class="page-info">Page {{ activePage() }} of {{ totalPages() }}</span>
+            <button type="button" class="page-btn" (click)="nextPage()" [disabled]="activePage() === totalPages()">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>
+
+<!-- Delete Modal -->
+<app-modal
+  [isOpen]="showDeleteModal()"
+  title="Delete Student"
+  (close)="closeDeleteModal()"
+>
+  <p>Are you sure you want to delete <strong>{{ studentToDelete()?.firstName }} {{ studentToDelete()?.lastName }}</strong>?</p>
+  <div class="modal-actions" slot="footer">
+    <app-button variant="outline" (clicked)="closeDeleteModal()">Cancel</app-button>
+    <app-button variant="danger" [loading]="isDeleting()" (clicked)="deleteStudent()">Delete</app-button>
+  </div>
+</app-modal>

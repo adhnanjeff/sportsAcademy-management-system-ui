@@ -1,0 +1,183 @@
+<div class="batch-list-page page-enter">
+  <div class="page-header animate-fade-in-up">
+    <div class="header-content">
+      <h1>Batches</h1>
+      <p>Manage your training batches</p>
+    </div>
+    <a routerLink="new" class="create-btn">
+      <i class="fa-solid fa-plus"></i>
+      <span class="btn-text">Create Batch</span>
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters animate-fade-in-up stagger-1">
+    <div class="search-box">
+      <i class="fa-solid fa-search"></i>
+      <input
+        type="text"
+        placeholder="Search batches..."
+        [value]="searchQuery()"
+        (input)="onSearch($event)"
+      />
+    </div>
+    <div class="filter-tabs">
+      <button
+        class="filter-tab"
+        [class.active]="selectedFilter() === 'all'"
+        (click)="setFilter('all')"
+      >
+        All
+      </button>
+      <button
+        class="filter-tab"
+        [class.active]="selectedFilter() === 'BEGINNER'"
+        (click)="setFilter('BEGINNER')"
+      >
+        <span class="filter-text">Beginner</span>
+        <span class="filter-short">Beg</span>
+      </button>
+      <button
+        class="filter-tab"
+        [class.active]="selectedFilter() === 'INTERMEDIATE'"
+        (click)="setFilter('INTERMEDIATE')"
+      >
+        <span class="filter-text">Intermediate</span>
+        <span class="filter-short">Int</span>
+      </button>
+      <button
+        class="filter-tab"
+        [class.active]="selectedFilter() === 'ADVANCED'"
+        (click)="setFilter('ADVANCED')"
+      >
+        <span class="filter-text">Advanced</span>
+        <span class="filter-short">Adv</span>
+      </button>
+      <button
+        class="filter-tab"
+        [class.active]="selectedFilter() === 'PROFESSIONAL'"
+        (click)="setFilter('PROFESSIONAL')"
+      >
+        <span class="filter-text">Professional</span>
+        <span class="filter-short">Pro</span>
+      </button>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="batches-grid animate-fade-in stagger-2">
+      <app-skeleton-loader type="card" [count]="6" />
+    </div>
+  } @else if (filteredBatches().length === 0) {
+    <div class="empty-state-container">
+      <div class="empty-state">
+        <div class="empty-illustration">
+          <div class="illustration-circle">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div class="illustration-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <h3>No batches created yet</h3>
+        <p>Organize your students into training batches. Set schedules, assign coaches, and manage group sessions efficiently.</p>
+        <a routerLink="new" class="create-btn primary">
+          <i class="fa-solid fa-plus"></i>
+          Create Your First Batch
+        </a>
+        <div class="empty-features">
+          <div class="feature-item">
+            <i class="fa-solid fa-users"></i>
+            <span>Group Students</span>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Set Schedules</span>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-user-tie"></i>
+            <span>Assign Coaches</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  } @else {
+      <div class="batches-grid card-grid-animate">
+        @for (batch of filteredBatches(); track batch.id) {
+          <div class="batch-card">
+            <div class="batch-header">
+              <div class="batch-title">
+                <h3>{{ batch.name }}</h3>
+                <app-badge
+                  [text]="formatSkillLevel(batch.skillLevel || '')"
+                  [variant]="getSkillBadgeVariant(batch.skillLevel || '')"
+                  size="sm"
+                />
+              </div>
+              <div class="batch-menu">
+                <button class="menu-btn" (click)="toggleMenu(batch.id)">
+                  <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                @if (activeMenuId() === batch.id) {
+                  <div class="menu-dropdown">
+                    <a [routerLink]="[batch.id]" class="menu-item">
+                      <i class="fa-solid fa-eye"></i>
+                      View Details
+                    </a>
+                    <a [routerLink]="[batch.id, 'edit']" class="menu-item">
+                      <i class="fa-solid fa-pen"></i>
+                      Edit Batch
+                    </a>
+                    <button class="menu-item danger" (click)="confirmDelete(batch)">
+                      <i class="fa-solid fa-trash"></i>
+                      Delete
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+
+            @if (batch.description) {
+              <p class="batch-description">{{ batch.description }}</p>
+            }
+
+            <div class="batch-info">
+              <div class="info-item">
+                <i class="fa-solid fa-users"></i>
+                <span>{{ batch.totalStudents }} students</span>
+              </div>
+              <div class="info-item">
+                <i class="fa-regular fa-clock"></i>
+                <span>{{ batch.startTime }} - {{ batch.endTime }}</span>
+              </div>
+            </div>
+
+            <div class="batch-footer">
+              <span class="coach-name">
+                <i class="fa-solid fa-user"></i>
+                {{ batch.coachName }}
+              </span>
+              <a [routerLink]="[batch.id]" class="view-btn">
+                View
+                <i class="fa-solid fa-arrow-right"></i>
+              </a>
+            </div>
+          </div>
+        }
+      </div>
+    }
+</div>
+
+<!-- Delete Confirmation Modal -->
+<app-modal
+  [isOpen]="showDeleteModal()"
+  title="Delete Batch"
+  (close)="closeDeleteModal()"
+>
+  <p>Are you sure you want to delete <strong>{{ batchToDelete()?.name }}</strong>?</p>
+  <p class="warning-text">This action cannot be undone. All students in this batch will be unassigned.</p>
+  <div class="modal-actions" slot="footer">
+    <app-button variant="outline" (clicked)="closeDeleteModal()">Cancel</app-button>
+    <app-button variant="danger" [loading]="isDeleting()" (clicked)="deleteBatch()">Delete</app-button>
+  </div>
+</app-modal>

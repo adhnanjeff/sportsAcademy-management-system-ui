@@ -1,0 +1,22 @@
+<div class="dashboard-layout" [class.sidebar-collapsed]="isSidebarCollapsed()">
+  <app-header
+    [user]="currentUser() ?? undefined"
+    [sidebarCollapsed]="isSidebarCollapsed()"
+    (menuToggle)="onToggleSidebar()"
+    (logout)="onLogout()"
+  />
+
+  <app-sidebar
+    [isCollapsed]="isSidebarCollapsed()"
+    [isMobileOpen]="isMobileSidebarOpen()"
+    (mobileClose)="closeMobileSidebar()"
+  />
+
+  <div class="main-area">
+    <main class="content-area">
+      <div class="content-wrapper fade-in">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+</div>

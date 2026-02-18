@@ -1,0 +1,256 @@
+<div class="dashboard-home page-enter">
+  <!-- Welcome Section -->
+  <section class="welcome-section animate-fade-in-up">
+    <div class="welcome-content">
+      <h1>Good {{ getGreeting() }}, {{ userDisplayName() }}!</h1>
+      <p>Here's what's happening at your academy today</p>
+    </div>
+    <div class="welcome-date">
+      <i class="fa-regular fa-calendar"></i>
+      <span>{{ today | date:'EEEE, MMM d, y' }}</span>
+    </div>
+  </section>
+
+  @if (isLoading()) {
+    <!-- Skeleton Loading State -->
+    <section class="stats-section">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="dashboard-stat-skeleton skeleton-card">
+          <div class="dashboard-stat-skeleton-icon skeleton skeleton-circle"></div>
+          <div class="dashboard-stat-skeleton-content">
+            <div class="skeleton skeleton-text sm"></div>
+            <div class="skeleton skeleton-text lg"></div>
+          </div>
+        </div>
+      }
+    </section>
+
+    <section class="quick-actions-section skeleton-card animate-fade-in stagger-2">
+      <div class="skeleton-actions">
+        @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+          <div class="skeleton-action">
+            <div class="skeleton skeleton-circle" style="width: 48px; height: 48px;"></div>
+            <div class="skeleton skeleton-text" style="width: 80px; height: 12px; margin-top: 8px;"></div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="content-grid animate-fade-in stagger-3">
+      <div class="schedule-column">
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-text lg" style="width: 150px; margin-bottom: 20px;"></div>
+          <app-skeleton-loader type="list" [count]="4" />
+        </div>
+      </div>
+      <div class="right-column">
+        <app-skeleton-loader type="card" [count]="2" />
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-text lg" style="width: 150px; margin-bottom: 20px;"></div>
+          <app-skeleton-loader type="list" [count]="3" />
+        </div>
+      </div>
+    </section>
+  } @else {
+    <!-- Stats Section -->
+    <section class="stats-section card-grid-animate">
+      <app-stat-card
+        label="Total Students"
+        [value]="stats()?.totalStudents || 0"
+        icon="fa-solid fa-users"
+        accentColor="var(--primary-color)"
+      />
+      <app-stat-card
+        label="Active Batches"
+        [value]="stats()?.activeBatches || 0"
+        icon="fa-solid fa-layer-group"
+        accentColor="var(--secondary-color)"
+      />
+      <app-stat-card
+        label="Today's Sessions"
+        [value]="stats()?.classesToday || 0"
+        icon="fa-solid fa-calendar-day"
+        accentColor="var(--success-color)"
+      />
+      <app-stat-card
+        label="Attendance Rate"
+        [value]="'95%'"
+        icon="fa-solid fa-chart-line"
+        accentColor="var(--info-color)"
+      />
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="quick-actions-section animate-fade-in-up stagger-2">
+      <app-card title="Quick Actions" icon="fa-solid fa-bolt">
+        <app-quick-actions 
+          [actions]="quickActions()"
+          (actionClicked)="onQuickAction($event)"
+        />
+      </app-card>
+    </section>
+
+    <section class="dashboard-top-grid animate-fade-in-up stagger-3" [class.only-batches]="!canViewTrendChart()">
+      @if (canViewTrendChart()) {
+        <app-card title="Attendance Trend (Last 14 Days)" icon="fa-solid fa-chart-area" [fullHeight]="true">
+          @if (isLoadingTrend()) {
+            <app-skeleton-loader type="stats" [count]="3" />
+            <div class="trend-loading-chart">
+              <app-skeleton-loader type="card" [count]="1" />
+            </div>
+          } @else if (attendanceTrend().length === 0) {
+            <div class="trend-empty">
+              <i class="fa-regular fa-chart-bar"></i>
+              <p>No attendance trend data available yet.</p>
+            </div>
+          } @else {
+            <div class="trend-metrics">
+              <div class="trend-metric">
+                <span class="metric-label">Average Attendance</span>
+                <strong class="metric-value">{{ trendAverageRate() }}%</strong>
+              </div>
+              <div class="trend-metric">
+                <span class="metric-label">Marked Entries</span>
+                <strong class="metric-value">{{ trendTotalEntries() }}</strong>
+              </div>
+              <div class="trend-metric">
+                <span class="metric-label">Period</span>
+                <strong class="metric-value">{{ trendRangeText() }}</strong>
+              </div>
+            </div>
+
+            <div class="trend-chart-wrap">
+              <div class="chart-panel">
+                <div class="chart-panel-header">
+                  <h4>Attendance Quality</h4>
+                  <span>Hover segments for details</span>
+                </div>
+
+                <div class="trend-donut-chart">
+                  <svg class="donut-svg" viewBox="0 0 120 120" (mouseleave)="onDonutLeave()">
+                    <g transform="translate(60,60) rotate(-90) translate(-60,-60)">
+                      <circle class="donut-track" cx="60" cy="60" r="44"></circle>
+                      <circle
+                        class="donut-segment attended"
+                        cx="60"
+                        cy="60"
+                        r="44"
+                        [attr.stroke-dasharray]="attendedDasharray()"
+                        (mouseenter)="onDonutSegmentHover('attended')"
+                      ></circle>
+                      <circle
+                        class="donut-segment missed"
+                        cx="60"
+                        cy="60"
+                        r="44"
+                        [attr.stroke-dasharray]="missedDasharray()"
+                        [attr.stroke-dashoffset]="missedDashoffset()"
+                        (mouseenter)="onDonutSegmentHover('missed')"
+                      ></circle>
+                    </g>
+                  </svg>
+
+                  <div class="trend-donut-inner">
+                    <strong>{{ trendAttendancePercent() }}%</strong>
+                    <span>Attended</span>
+                  </div>
+
+                  @if (hoveredDonutSegment()) {
+                    <div class="floating-tooltip donut-tooltip">
+                      {{ donutTooltipText() }}
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="chart-panel">
+                <div class="chart-panel-header">
+                  <h4>Daily Marked Entries</h4>
+                  <span>Hover bars for details</span>
+                </div>
+
+                <div class="entries-chart" (mouseleave)="onEntriesBarLeave()">
+                  @for (bar of trendEntryBars(); track bar.date) {
+                    <div class="entry-bar-wrap" (mouseenter)="onEntriesBarHover(bar)">
+                      <div
+                        class="entry-bar"
+                        [class.active]="hoveredEntriesBar()?.date === bar.date"
+                        [style.height.%]="bar.heightPercent"
+                      ></div>
+                    </div>
+                  }
+
+                  @if (hoveredEntriesBar()) {
+                    <div
+                      class="floating-tooltip entries-tooltip"
+                      [style.left.%]="entriesTooltipLeftPercent()"
+                      [style.top.%]="entriesTooltipTopPercent()"
+                    >
+                      {{ hoveredEntriesBar()!.label }}: {{ hoveredEntriesBar()!.totalEntries }} entries
+                    </div>
+                  }
+                </div>
+
+                <div class="entries-axis-labels">
+                  <span>{{ trendStartLabel() }}</span>
+                  <span>{{ trendEndLabel() }}</span>
+                </div>
+              </div>
+            </div>
+          }
+        </app-card>
+      }
+
+      <app-card title="My Batches" icon="fa-solid fa-layer-group" [headerAction]="true" [fullHeight]="true">
+        <a routerLink="/dashboard/batches" card-action class="card-action">
+          View All
+          <i class="fa-solid fa-arrow-right"></i>
+        </a>
+        <div class="batches-grid card-grid-animate">
+          @for (batch of recentBatches(); track batch.id) {
+            <app-batch-card
+              [batch]="batch"
+              (viewDetails)="onViewBatch($event)"
+            />
+          } @empty {
+            <div class="empty-batches">
+              <i class="fa-regular fa-folder-open"></i>
+              <p>No batches assigned yet</p>
+            </div>
+          }
+        </div>
+      </app-card>
+    </section>
+
+    <!-- Main Content Grid -->
+    <section class="content-grid animate-fade-in-up stagger-4">
+      <app-card title="Today's Schedule" icon="fa-solid fa-clock" [headerAction]="true" [fullHeight]="true">
+        <a routerLink="/dashboard/schedule" card-action class="card-action">
+          View All
+          <i class="fa-solid fa-arrow-right"></i>
+        </a>
+        <div class="schedule-list list-animate">
+          @for (item of todaySchedule(); track item.id) {
+            <app-schedule-item
+              [item]="item"
+              (markComplete)="onMarkComplete($event)"
+            />
+          } @empty {
+            <div class="empty-schedule">
+              <i class="fa-regular fa-calendar-xmark"></i>
+              <p>No sessions scheduled for today</p>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card title="Recent Activity" icon="fa-solid fa-bell" [headerAction]="true" [fullHeight]="true">
+        <a routerLink="/activity" card-action class="card-action">
+          View All
+          <i class="fa-solid fa-arrow-right"></i>
+        </a>
+        <app-activity-feed [activities]="recentActivity()" />
+      </app-card>
+    </section>
+  }
+</div>

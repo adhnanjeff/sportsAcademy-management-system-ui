@@ -1,0 +1,171 @@
+<div class="login-container">
+  <div class="login-card">
+    <!-- Logo & Title -->
+    <div class="login-header">
+      <div class="logo">
+        <i class="fa-solid fa-shuttlecock"></i>
+      </div>
+      <h1>Welcome Back</h1>
+      <p>Sign in to continue to Badminton Academy</p>
+    </div>
+
+    <!-- Login Method Tabs -->
+    <div class="login-tabs">
+      <button 
+        type="button"
+        [class.active]="loginMethod() === 'email'"
+        (click)="switchMethod('email')"
+      >
+        <i class="fa-regular fa-envelope"></i>
+        Email
+      </button>
+      <button 
+        type="button"
+        [class.active]="loginMethod() === 'phone'"
+        (click)="switchMethod('phone')"
+      >
+        <i class="fa-solid fa-phone"></i>
+        Phone
+      </button>
+    </div>
+
+    <!-- Email Login Form -->
+    @if (loginMethod() === 'email') {
+      <form [formGroup]="emailForm" (ngSubmit)="onEmailLogin()">
+        <div class="form-group">
+          <app-input
+            type="email"
+            label="Email Address"
+            placeholder="Enter your email"
+            prefixIcon="fa-regular fa-envelope"
+            formControlName="email"
+            [required]="true"
+            [error]="getError('email')"
+          />
+        </div>
+
+        <div class="form-group">
+          <app-input
+            type="password"
+            label="Password"
+            placeholder="Enter your password"
+            prefixIcon="fa-solid fa-lock"
+            formControlName="password"
+            [required]="true"
+            [error]="getError('password')"
+          />
+        </div>
+
+        <div class="form-options">
+          <label class="checkbox-label">
+            <input type="checkbox" formControlName="rememberMe" />
+            <span>Remember me</span>
+          </label>
+          <a routerLink="/auth/forgot-password" class="forgot-link">
+            Forgot password?
+          </a>
+        </div>
+
+        <app-button
+          type="submit"
+          variant="primary"
+          [fullWidth]="true"
+          [loading]="isLoading()"
+          [disabled]="emailForm.invalid"
+        >
+          Sign In
+        </app-button>
+      </form>
+    }
+
+    <!-- Phone Login Form -->
+    @if (loginMethod() === 'phone') {
+      <form [formGroup]="phoneForm" (ngSubmit)="onPhoneLogin()">
+        @if (!otpSent()) {
+          <div class="form-group">
+            <app-phone-input
+              label="Phone Number"
+              placeholder="Enter phone number"
+              [required]="true"
+              [error]="phoneError()"
+              (valueChange)="onPhoneChange($event)"
+              (countryChange)="onCountryChange($event)"
+            />
+          </div>
+
+          <app-button
+            type="submit"
+            variant="primary"
+            [fullWidth]="true"
+            [loading]="isLoading()"
+            [disabled]="!isPhoneValid()"
+          >
+            Send OTP
+          </app-button>
+        } @else {
+          <div class="otp-info">
+            <p>We've sent a 6-digit code to</p>
+            <strong>{{ phoneNumber() }}</strong>
+            <button type="button" class="change-number" (click)="resetOtp()">
+              Change number
+            </button>
+          </div>
+
+          <div class="form-group">
+            <div class="otp-inputs">
+              @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+                <input
+                  type="text"
+                  maxlength="1"
+                  class="otp-input"
+                  [id]="'otp-' + i"
+                  (input)="onOtpInput($event, i)"
+                  (keydown)="onOtpKeydown($event, i)"
+                  (paste)="onOtpPaste($event)"
+                />
+              }
+            </div>
+            @if (otpError()) {
+              <span class="error-text">{{ otpError() }}</span>
+            }
+          </div>
+
+          <div class="resend-section">
+            @if (resendTimer() > 0) {
+              <span class="resend-timer">Resend OTP in {{ resendTimer() }}s</span>
+            } @else {
+              <button type="button" class="resend-btn" (click)="resendOtp()">
+                Resend OTP
+              </button>
+            }
+          </div>
+
+          <app-button
+            type="submit"
+            variant="primary"
+            [fullWidth]="true"
+            [loading]="isLoading()"
+            [disabled]="otp().length !== 6"
+          >
+            Verify & Sign In
+          </app-button>
+        }
+      </form>
+    }
+
+    <!-- Sign Up Link -->
+    <p class="signup-link">
+      Don't have an account? 
+      <a routerLink="/auth/signup">Sign up</a>
+    </p>
+  </div>
+
+  <!-- Decorative Background -->
+  <div class="login-bg">
+    <div class="bg-content">
+      <i class="fa-solid fa-shuttlecock bg-icon"></i>
+      <h2>Badminton Academy</h2>
+      <p>Manage your academy with ease</p>
+    </div>
+  </div>
+</div>
