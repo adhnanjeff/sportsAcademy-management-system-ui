@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, map, of } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { CacheService } from '../../../core/services/cache.service';
 import {
   DashboardStats,
   DashboardAttendanceTrendPoint,
@@ -49,6 +50,7 @@ interface AttendanceApiResponse {
 export class DashboardService {
   private readonly api = inject(ApiService);
   private readonly authService = inject(AuthService);
+  private readonly cache = inject(CacheService);
 
   getCoachDashboard(): Observable<CoachDashboard> {
     return forkJoin({

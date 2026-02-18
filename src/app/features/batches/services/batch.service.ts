@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
+import { CacheService } from '../../../core/services/cache.service';
 import { Batch, SkillLevel } from '../../../core/models';
 
 export interface CreateBatchRequest {
@@ -31,6 +32,9 @@ interface BatchApiResponse {
 })
 export class BatchService {
   private apiService = inject(ApiService);
+  private cache = inject(CacheService);
+
+  private readonly CACHE_PREFIX = 'GET:/batches';
 
   private mapBatchResponse(response: BatchApiResponse): Batch {
     return {
@@ -49,13 +53,21 @@ export class BatchService {
   }
 
   getBatches(): Observable<Batch[]> {
-    return this.apiService.get<BatchApiResponse[]>('/batches').pipe(
+    return this.apiService.get<BatchApiResponse[]>(
+      '/batches',
+      undefined,
+      { ttl: this.cache.CACHE_DURATIONS.MEDIUM }
+    ).pipe(
       map(responses => responses.map(r => this.mapBatchResponse(r)))
     );
   }
 
   getBatchById(id: number): Observable<Batch | undefined> {
-    return this.apiService.get<BatchApiResponse>(`/batches/${id}`).pipe(
+    return this.apiService.get<BatchApiResponse>(
+      `/batches/${id}`,
+      undefined,
+      { ttl: this.cache.CACHE_DURATIONS.SHORT }
+    ).pipe(
       map(r => this.mapBatchResponse(r))
     );
   }
@@ -69,7 +81,7 @@ export class BatchService {
       endTime: data.endTime
     };
 
-    return this.apiService.post<BatchApiResponse>('/batches', createPayload).pipe(
+    return this.apiService.post<BatchApiResponse>('/batches', createPayload, this.CACHE_PREFIX).pipe(
       map(r => this.mapBatchResponse(r))
     );
   }
@@ -83,17 +95,21 @@ export class BatchService {
       endTime: data.endTime
     };
 
-    return this.apiService.put<BatchApiResponse>(`/batches/${id}`, updatePayload).pipe(
+    return this.apiService.put<BatchApiResponse>(`/batches/${id}`, updatePayload, this.CACHE_PREFIX).pipe(
       map(r => this.mapBatchResponse(r))
     );
   }
 
   deleteBatch(id: number): Observable<void> {
-    return this.apiService.delete(`/batches/${id}`);
+    return this.apiService.delete(`/batches/${id}`, this.CACHE_PREFIX);
   }
 
   getMyBatches(): Observable<Batch[]> {
-    return this.apiService.get<BatchApiResponse[]>('/batches/active').pipe(
+    return this.apiService.get<BatchApiResponse[]>(
+      '/batches/active',
+      undefined,
+      { ttl: this.cache.CACHE_DURATIONS.MEDIUM }
+    ).pipe(
       map(responses => responses.map(r => this.mapBatchResponse(r)))
     );
   }

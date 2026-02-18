@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, map, switchMap } from 'rxjs';
+import { Observable, map, switchMap, tap } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { CacheService } from '../../../core/services/cache.service';
 import { Student, Gender, SkillLevel, DayOfWeek, Role, MonthlyFeeStatus, FeePaymentHistory } from '../../../core/models';
 
 export interface CreateStudentRequest {
@@ -61,6 +62,9 @@ interface StudentApiResponse {
 export class StudentService {
   private apiService = inject(ApiService);
   private authService = inject(AuthService);
+  private cache = inject(CacheService);
+
+  private readonly CACHE_PREFIX = 'GET:/students';
 
   private mapStudentResponse(response: StudentApiResponse): Student {
     return {
@@ -100,25 +104,41 @@ export class StudentService {
 
     // Parents can only see their children
     if (user?.role === Role.PARENT) {
-      return this.apiService.get<StudentApiResponse[]>(`/students/parent/${user.id}`).pipe(
+      return this.apiService.get<StudentApiResponse[]>(
+        `/students/parent/${user.id}`,
+        undefined,
+        { ttl: this.cache.CACHE_DURATIONS.MEDIUM }
+      ).pipe(
         map(responses => responses.map(r => this.mapStudentResponse(r)))
       );
     }
 
-    // Admin and Coach can see all students
-    return this.apiService.get<StudentApiResponse[]>('/students').pipe(
+    // Admin and Coach can see all students - cache for 5 minutes
+    return this.apiService.get<StudentApiResponse[]>(
+      '/students',
+      undefined,
+      { ttl: this.cache.CACHE_DURATIONS.MEDIUM }
+    ).pipe(
       map(responses => responses.map(r => this.mapStudentResponse(r)))
     );
   }
 
   getStudentById(id: number): Observable<Student | undefined> {
-    return this.apiService.get<StudentApiResponse>(`/students/${id}`).pipe(
+    return this.apiService.get<StudentApiResponse>(
+      `/students/${id}`,
+      undefined,
+      { ttl: this.cache.CACHE_DURATIONS.SHORT }
+    ).pipe(
       map(r => this.mapStudentResponse(r))
     );
   }
 
   getStudentsByBatch(batchId: number): Observable<Student[]> {
-    return this.apiService.get<StudentApiResponse[]>(`/students/batch/${batchId}`).pipe(
+    return this.apiService.get<StudentApiResponse[]>(
+      `/students/batch/${batchId}`,
+      undefined,
+      { ttl: this.cache.CACHE_DURATIONS.MEDIUM }
+    ).pipe(
       map(responses => responses.map(r => this.mapStudentResponse(r)))
     );
   }
@@ -144,7 +164,7 @@ export class StudentService {
       monthlyFeeStatus: data.monthlyFeeStatus || undefined
     };
 
-    return this.apiService.post<StudentApiResponse>('/students', createPayload).pipe(
+    return this.apiService.post<StudentApiResponse>('/students', createPayload, this.CACHE_PREFIX).pipe(
       map(response => this.mapStudentResponse(response))
     );
   }
@@ -169,13 +189,13 @@ export class StudentService {
       monthlyFeeStatus: data.monthlyFeeStatus
     };
 
-    return this.apiService.put<StudentApiResponse>(`/students/${id}`, updatePayload).pipe(
+    return this.apiService.put<StudentApiResponse>(`/students/${id}`, updatePayload, this.CACHE_PREFIX).pipe(
       map(r => this.mapStudentResponse(r))
     );
   }
 
   deleteStudent(id: number): Observable<void> {
-    return this.apiService.delete(`/students/${id}`);
+    return this.apiService.delete(`/students/${id}`, this.CACHE_PREFIX);
   }
 
   assignToBatch(studentId: number, batchId: number): Observable<Student> {
