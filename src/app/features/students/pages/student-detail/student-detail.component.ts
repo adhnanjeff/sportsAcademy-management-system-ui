@@ -153,6 +153,10 @@ import { SkeletonLoaderComponent } from '../../../../shared/components/skeleton-
                 <span class="info-value">{{ formatSkillLevel(student()?.skillLevel || 'Not assessed') }}</span>
               </div>
               <div class="info-item">
+                <span class="info-label">Training Days</span>
+                <span class="info-value">{{ formatTrainingDays(student()?.daysOfWeek) }}</span>
+              </div>
+              <div class="info-item">
                 <span class="info-label">Fee Payable</span>
                 <span class="info-value">{{ student()?.feePayable ?? 0 }}</span>
               </div>
@@ -517,6 +521,16 @@ export class StudentDetailComponent implements OnInit {
   attendanceStats = signal({ present: 0, absent: 0, late: 0, percentage: 0 });
   isLoadingFeeHistory = signal(false);
   feeHistory = signal<FeePaymentHistory[]>([]);
+  private readonly dayOrder = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+  private readonly dayLabels: Record<string, string> = {
+    MONDAY: 'Mon',
+    TUESDAY: 'Tue',
+    WEDNESDAY: 'Wed',
+    THURSDAY: 'Thu',
+    FRIDAY: 'Fri',
+    SATURDAY: 'Sat',
+    SUNDAY: 'Sun'
+  };
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -616,6 +630,20 @@ export class StudentDetailComponent implements OnInit {
   formatSkillLevel(level: string): string {
     if (!level || level === 'Not assessed') return level;
     return level.charAt(0) + level.slice(1).toLowerCase();
+  }
+
+  formatTrainingDays(days: string[] | undefined): string {
+    if (!days || days.length === 0) {
+      return 'Not set';
+    }
+
+    const sortedDays = [...days].sort(
+      (a, b) => this.dayOrder.indexOf(a) - this.dayOrder.indexOf(b)
+    );
+
+    return sortedDays
+      .map((day) => this.dayLabels[day] || day)
+      .join(', ');
   }
 
   formatFeeStatus(status: MonthlyFeeStatus): string {
