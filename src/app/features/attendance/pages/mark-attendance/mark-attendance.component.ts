@@ -9,7 +9,8 @@ import {
   AttendanceBatch
 } from '../../services/attendance.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { AttendanceStatus } from '../../../../core/models';
+import { AuthService } from '../../../../core/services/auth.service';
+import { AttendanceStatus, AttendanceEntryType, Role } from '../../../../core/models';
 import { CardComponent } from '../../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
 import { SkeletonLoaderComponent } from '../../../../shared/components/skeleton-loader/skeleton-loader.component';
@@ -90,7 +91,7 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
                 variant="outline"
                 size="sm"
                 icon="fa-solid fa-check-double"
-                [disabled]="isPastDate()"
+                [disabled]="isLocked()"
                 (clicked)="markAllPresent()"
               >
                 Mark All Present
@@ -99,10 +100,19 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
                 variant="outline"
                 size="sm"
                 icon="fa-solid fa-xmark"
-                [disabled]="isPastDate()"
+                [disabled]="isLocked()"
                 (clicked)="markAllAbsent()"
               >
                 Mark All Absent
+              </app-button>
+              <app-button
+                variant="outline"
+                size="sm"
+                icon="fa-solid fa-user-plus"
+                [disabled]="isLocked()"
+                (clicked)="showAddMakeupModal()"
+              >
+                Add Makeup Student
               </app-button>
             </div>
           </div>
@@ -113,13 +123,23 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
           </div>
 
           @if (isPastDate()) {
-            <div class="attendance-locked-banner animate-fade-in" role="status" aria-live="polite">
-              <i class="fa-solid fa-lock"></i>
-              <div class="banner-content">
-                <h4>Attendance Locked</h4>
-                <p>Attendance for {{ selectedDate() }} is locked because the date has already passed.</p>
+            @if (isWithinBackdateWindow()) {
+              <div class="backdate-info-banner animate-fade-in" role="status" aria-live="polite">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <div class="banner-content">
+                  <h4>Backdated Attendance</h4>
+                  <p>You are marking attendance for {{ selectedDate() }} ({{ getDaysAgo() }} days ago). A reason will be required.</p>
+                </div>
               </div>
-            </div>
+            } @else {
+              <div class="attendance-locked-banner animate-fade-in" role="status" aria-live="polite">
+                <i class="fa-solid fa-lock"></i>
+                <div class="banner-content">
+                  <h4>Attendance Locked</h4>
+                  <p>{{ isAdmin() ? 'Admin' : 'Coach' }} access allows backdating up to {{ isAdmin() ? '30' : '7' }} days. This date is {{ getDaysAgo() }} days ago.</p>
+                </div>
+              </div>
+            }
           }
 
           <!-- Students List -->
@@ -147,7 +167,7 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
                 @for (student of filteredStudents(); track student.studentId) {
                   <app-attendance-card
                     [student]="student"
-                    [disabled]="isPastDate()"
+                    [disabled]="isLocked()"
                     (statusChange)="onStatusChange($event)"
                     (notesChange)="onNotesChange($event)"
                   />
@@ -162,15 +182,28 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
 
             <!-- Submit Button -->
             <div class="submit-section animate-fade-in-up stagger-4">
+              @if (requiresBackdateReason()) {
+                <div class="backdate-reason-container">
+                  <label for="backdate-reason">Reason for backdated entry <span class="required">*</span></label>
+                  <textarea
+                    id="backdate-reason"
+                    [value]="backdateReason()"
+                    (input)="onBackdateReasonChange($event)"
+                    placeholder="Enter reason for marking attendance for a past date..."
+                    rows="2"
+                    class="backdate-reason-input"
+                  ></textarea>
+                </div>
+              }
               <app-button
                 variant="primary"
                 size="lg"
                 icon="fa-solid fa-paper-plane"
                 [loading]="isSubmitting()"
-                [disabled]="students().length === 0 || isPastDate()"
+                [disabled]="students().length === 0 || isLocked() || (requiresBackdateReason() && !backdateReason())"
                 (clicked)="submitAttendance()"
               >
-                Submit Attendance
+                {{ requiresBackdateReason() ? 'Submit Backdated Attendance' : 'Submit Attendance' }}
               </app-button>
             </div>
           }
@@ -417,7 +450,7 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 16px;
       justify-content: center;
       padding: 24px;
       background-color: var(--white);
@@ -426,6 +459,69 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
       position: sticky;
       bottom: 24px;
       box-shadow: var(--shadow-lg);
+    }
+
+    .backdate-reason-container {
+      width: 100%;
+      max-width: 500px;
+      
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-primary);
+        
+        .required {
+          color: var(--error-color);
+        }
+      }
+    }
+
+    .backdate-reason-input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: var(--font-size-base);
+      resize: vertical;
+      
+      &:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.1);
+      }
+    }
+
+    .backdate-info-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #fff8e5 0%, #fff3cd 100%);
+      border: 1px solid #ffc107;
+      border-radius: var(--border-radius-lg);
+      border-left: 4px solid #ffc107;
+
+      i {
+        font-size: 24px;
+        color: #c69500;
+        margin-top: 2px;
+      }
+
+      .banner-content {
+        h4 {
+          margin: 0 0 4px;
+          font-size: var(--font-size-base);
+          font-weight: 600;
+          color: #8a6d00;
+        }
+
+        p {
+          margin: 0;
+          font-size: var(--font-size-sm);
+          color: #a17c00;
+        }
+      }
     }
 
     @media (max-width: 640px) {
@@ -448,8 +544,10 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
 export class MarkAttendanceComponent implements OnInit {
   private attendanceService = inject(AttendanceService);
   private toastService = inject(ToastService);
+  private authService = inject(AuthService);
   private router = inject(Router);
   readonly AttendanceStatus = AttendanceStatus;
+  readonly AttendanceEntryType = AttendanceEntryType;
 
   // State signals
   isLoadingBatches = signal(true);
@@ -460,6 +558,9 @@ export class MarkAttendanceComponent implements OnInit {
   students = signal<StudentAttendance[]>([]);
   searchQuery = signal('');
   selectedDate = signal(this.getTodayLocalIso());
+  backdateReason = signal('');
+  showMakeupStudentModal = signal(false);
+  allBatchStudents = signal<StudentAttendance[]>([]);
 
   // Computed
   selectedBatch = computed(() => {
@@ -481,6 +582,26 @@ export class MarkAttendanceComponent implements OnInit {
     return selected < today;
   });
 
+  isAdmin = computed(() => {
+    const user = this.authService.currentUser();
+    return user?.role === Role.ADMIN;
+  });
+
+  isWithinBackdateWindow = computed(() => {
+    return this.attendanceService.isWithinBackdateWindow(
+      this.selectedDate(), 
+      this.isAdmin()
+    );
+  });
+
+  requiresBackdateReason = computed(() => {
+    return this.attendanceService.requiresBackdateReason(this.selectedDate());
+  });
+
+  isLocked = computed(() => {
+    return this.isPastDate() && !this.isWithinBackdateWindow();
+  });
+
   selectedDayLabel = computed(() => {
     const dateValue = this.selectedDate();
     const [year, month, day] = dateValue.split('-').map(Number);
@@ -491,6 +612,14 @@ export class MarkAttendanceComponent implements OnInit {
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', { weekday: 'long' });
   });
+
+  getDaysAgo(): number {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(this.selectedDate());
+    selected.setHours(0, 0, 0, 0);
+    return Math.floor((today.getTime() - selected.getTime()) / (1000 * 60 * 60 * 24));
+  }
 
   ngOnInit(): void {
     this.loadBatches();
@@ -581,14 +710,23 @@ export class MarkAttendanceComponent implements OnInit {
 
   submitAttendance(): void {
     const batchId = this.selectedBatchId();
-    if (!batchId || this.isPastDate()) return;
+    if (!batchId || this.isLocked()) return;
+
+    // Check if reason is required but not provided
+    if (this.requiresBackdateReason() && !this.backdateReason().trim()) {
+      this.toastService.error('Please provide a reason for backdated attendance');
+      return;
+    }
 
     const payload: AttendancePayload = {
       batchId,
       date: this.selectedDate(),
+      backdateReason: this.requiresBackdateReason() ? this.backdateReason().trim() : undefined,
       records: this.students().map(s => ({
         studentId: s.studentId,
         status: s.status,
+        entryType: s.entryType || AttendanceEntryType.REGULAR,
+        compensatesForDate: s.compensatesForDate,
         notes: s.notes
       }))
     };
@@ -598,13 +736,65 @@ export class MarkAttendanceComponent implements OnInit {
       next: (response) => {
         this.toastService.success(response.message);
         this.isSubmitting.set(false);
+        this.backdateReason.set('');
         this.onBackToBatches();
       },
-      error: () => {
-        this.toastService.error('Failed to submit attendance');
+      error: (err) => {
+        const message = err?.error?.message || 'Failed to submit attendance';
+        this.toastService.error(message);
         this.isSubmitting.set(false);
       }
     });
+  }
+
+  onBackdateReasonChange(event: Event): void {
+    const input = event.target as HTMLTextAreaElement;
+    this.backdateReason.set(input.value);
+  }
+
+  showAddMakeupModal(): void {
+    // Load all students for the batch (not filtered by day)
+    const batchId = this.selectedBatchId();
+    if (!batchId) return;
+
+    this.attendanceService.getAllStudentsForBatch(batchId).subscribe({
+      next: (allStudents) => {
+        // Filter out students already in the attendance list
+        const currentStudentIds = new Set(this.students().map(s => s.studentId));
+        const availableStudents = allStudents.filter(s => !currentStudentIds.has(s.studentId));
+        this.allBatchStudents.set(availableStudents);
+        this.showMakeupStudentModal.set(true);
+      },
+      error: () => {
+        this.toastService.error('Failed to load students for makeup');
+      }
+    });
+  }
+
+  addMakeupStudent(student: StudentAttendance): void {
+    // Add the student as a makeup entry
+    const makeupStudent: StudentAttendance = {
+      ...student,
+      entryType: AttendanceEntryType.MAKEUP,
+      status: AttendanceStatus.PRESENT,
+      isMarked: false
+    };
+    
+    this.students.update(students => [...students, makeupStudent]);
+    this.allBatchStudents.update(students => 
+      students.filter(s => s.studentId !== student.studentId)
+    );
+    this.toastService.info(`Added ${student.studentName} as makeup student`);
+  }
+
+  removeMakeupStudent(studentId: number): void {
+    const student = this.students().find(s => s.studentId === studentId);
+    if (student?.entryType === AttendanceEntryType.MAKEUP && !student.isMarked) {
+      this.students.update(students => 
+        students.filter(s => s.studentId !== studentId)
+      );
+      this.toastService.info('Makeup student removed');
+    }
   }
 
   private getTodayLocalIso(): string {

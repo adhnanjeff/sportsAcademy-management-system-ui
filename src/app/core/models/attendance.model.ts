@@ -1,4 +1,4 @@
-import { AttendanceStatus } from './enums.model';
+import { AttendanceStatus, AttendanceEntryType } from './enums.model';
 
 // Attendance Record Interface
 export interface Attendance {
@@ -10,10 +10,13 @@ export interface Attendance {
   batchName: string;
   date: string;
   status: AttendanceStatus;
+  entryType?: AttendanceEntryType;
+  compensatesForDate?: string;
   notes?: string;
   markedById?: number;
   markedByName?: string;
   markedAt?: string;
+  wasBackdated?: boolean;
 }
 
 // Mark Attendance Request
@@ -22,7 +25,10 @@ export interface AttendanceRequest {
   batchId: number;
   date: string;
   status: AttendanceStatus;
+  entryType?: AttendanceEntryType;
+  compensatesForDate?: string;
   notes?: string;
+  backdateReason?: string;
 }
 
 // Bulk Attendance Request
@@ -30,13 +36,40 @@ export interface BulkAttendanceRequest {
   batchId: number;
   date: string;
   studentAttendances: StudentAttendanceInput[];
+  backdateReason?: string;
 }
 
 // Individual student attendance in bulk request
 export interface StudentAttendanceInput {
   studentId: number;
   status: AttendanceStatus;
+  entryType?: AttendanceEntryType;
+  compensatesForDate?: string;
   notes?: string;
+}
+
+// Attendance Audit Log
+export interface AttendanceAuditLog {
+  id: number;
+  attendanceId: number;
+  studentId: number;
+  studentName: string;
+  batchId: number;
+  batchName: string;
+  attendanceDate: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  previousStatus?: AttendanceStatus;
+  previousEntryType?: AttendanceEntryType;
+  previousNotes?: string;
+  newStatus?: AttendanceStatus;
+  newEntryType?: AttendanceEntryType;
+  newNotes?: string;
+  changedById?: number;
+  changedByName?: string;
+  changedByRole: 'COACH' | 'ADMIN';
+  reason?: string;
+  wasBackdated: boolean;
+  changedAt: string;
 }
 
 // Attendance Summary Response

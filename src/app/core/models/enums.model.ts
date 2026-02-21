@@ -28,6 +28,12 @@ export enum AttendanceStatus {
   EXCUSED = 'EXCUSED'
 }
 
+// Attendance entry type enum
+export enum AttendanceEntryType {
+  REGULAR = 'REGULAR',
+  MAKEUP = 'MAKEUP'
+}
+
 // Achievement type enum
 export enum AchievementType {
   TOURNAMENT = 'TOURNAMENT',

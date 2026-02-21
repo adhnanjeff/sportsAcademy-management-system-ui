@@ -5,9 +5,11 @@ import { ApiService } from '../../../core/services/api.service';
 import { environment } from '../../../../environments/environment';
 import {
   AttendanceStatus,
+  AttendanceEntryType,
   DayOfWeek,
   SkillLevel
 } from '../../../core/models';
+import { AttendanceAuditLog } from '../../../core/models/attendance.model';
 
 export interface AttendanceSession {
   id: number;
@@ -28,17 +30,23 @@ export interface StudentAttendance {
   studentName: string;
   profileImage?: string;
   status: AttendanceStatus;
+  entryType?: AttendanceEntryType;
+  compensatesForDate?: string;
   checkInTime?: string;
   notes?: string;
   isMarked?: boolean;
+  wasBackdated?: boolean;
 }
 
 export interface AttendancePayload {
   batchId: number;
   date: string;
+  backdateReason?: string;
   records: {
     studentId: number;
     status: AttendanceStatus;
+    entryType?: AttendanceEntryType;
+    compensatesForDate?: string;
     notes?: string;
   }[];
 }
@@ -69,15 +77,20 @@ export interface AttendanceApiResponse {
   batchName: string;
   date: string;
   status: AttendanceStatus;
+  entryType?: AttendanceEntryType;
+  compensatesForDate?: string;
   notes?: string;
   markedById?: number;
   markedByName?: string;
   markedAt?: string;
+  wasBackdated?: boolean;
 }
 
 export interface AttendanceMatrixCell {
   date: string;
   status: AttendanceStatus | null;
+  entryType?: AttendanceEntryType | null;
+  compensatesForDate?: string | null;
   notes?: string | null;
   marked: boolean;
   futureDate: boolean;
@@ -259,9 +272,12 @@ export class AttendanceService {
     const request = {
       batchId: payload.batchId,
       date: payload.date,
+      backdateReason: payload.backdateReason,
       studentAttendances: payload.records.map(record => ({
         studentId: record.studentId,
         status: record.status,
+        entryType: record.entryType || AttendanceEntryType.REGULAR,
+        compensatesForDate: record.compensatesForDate,
         notes: record.notes
       }))
     };
@@ -272,6 +288,81 @@ export class AttendanceService {
         message: `Attendance saved for ${saved.length} student(s)`
       }))
     );
+  }
+
+  // ==================== AUDIT LOG METHODS ====================
+
+  getAuditLogByAttendanceId(attendanceId: number): Observable<AttendanceAuditLog[]> {
+    return this.apiService.get<AttendanceAuditLog[]>(`/attendance/${attendanceId}/audit-log`);
+  }
+
+  getAuditLogByStudentId(studentId: number): Observable<AttendanceAuditLog[]> {
+    return this.apiService.get<AttendanceAuditLog[]>(`/attendance/student/${studentId}/audit-log`);
+  }
+
+  getAuditLogByBatchId(batchId: number): Observable<AttendanceAuditLog[]> {
+    return this.apiService.get<AttendanceAuditLog[]>(`/attendance/batch/${batchId}/audit-log`);
+  }
+
+  getAllBackdatedChanges(): Observable<AttendanceAuditLog[]> {
+    return this.apiService.get<AttendanceAuditLog[]>('/attendance/audit-log/backdated');
+  }
+
+  // ==================== MAKEUP ATTENDANCE METHODS ====================
+
+  getEligibleAbsencesForMakeup(studentId: number, batchId: number): Observable<AttendanceApiResponse[]> {
+    return this.apiService.get<AttendanceApiResponse[]>(
+      `/attendance/student/${studentId}/batch/${batchId}/eligible-absences`
+    );
+  }
+
+  /**
+   * Get all students for a batch (without date filtering)
+   * Used for adding makeup students who aren't scheduled for the current day
+   */
+  getAllStudentsForBatch(batchId: number): Observable<StudentAttendance[]> {
+    return this.apiService.get<StudentApiResponse[]>(`/students/batch/${batchId}`).pipe(
+      map(students => students.map(student => ({
+        studentId: student.id,
+        studentName: student.fullName || `${student.firstName} ${student.lastName}`,
+        profileImage: student.photoUrl,
+        status: AttendanceStatus.PRESENT,
+        entryType: AttendanceEntryType.MAKEUP,
+        notes: '',
+        isMarked: false
+      })))
+    );
+  }
+
+  /**
+   * Check if a date is within the backdating window for the current user
+   */
+  isWithinBackdateWindow(date: string, isAdmin: boolean = false): boolean {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    const diffDays = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Coaches: 7 days, Admins: 30 days
+    const windowDays = isAdmin ? 30 : 7;
+    
+    return diffDays >= 0 && diffDays <= windowDays;
+  }
+
+  /**
+   * Check if a date requires backdate reason (is in the past)
+   */
+  requiresBackdateReason(date: string): boolean {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    return targetDate.getTime() < today.getTime();
   }
 
   getAttendanceHistory(batchId: number, startDate: string, endDate: string): Observable<AttendanceSession[]> {
