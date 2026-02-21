@@ -13,6 +13,7 @@ import { AuthService } from '../../../../core/services/auth.service';
 import { AttendanceStatus, AttendanceEntryType, Role } from '../../../../core/models';
 import { CardComponent } from '../../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../../shared/components/button/button.component';
+import { ModalComponent } from '../../../../shared/components/modal/modal.component';
 import { SkeletonLoaderComponent } from '../../../../shared/components/skeleton-loader/skeleton-loader.component';
 import { BatchSelectorComponent } from '../../components/batch-selector/batch-selector.component';
 import { AttendanceCardComponent } from '../../components/attendance-card/attendance-card.component';
@@ -26,6 +27,7 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
     FormsModule,
     CardComponent,
     ButtonComponent,
+    ModalComponent,
     SkeletonLoaderComponent,
     BatchSelectorComponent,
     AttendanceCardComponent,
@@ -173,8 +175,8 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
                   />
                 } @empty {
                   <div class="no-students animate-fade-in">
-                    <i class="fa-regular fa-user-slash"></i>
-                    <p>No students found</p>
+                    <i class="fa-solid fa-calendar-xmark"></i>
+                    <p>No students scheduled for this day</p>
                   </div>
                 }
               </div>
@@ -210,6 +212,60 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
         }
       }
     </div>
+
+    <app-modal
+      [isOpen]="showMakeupStudentModal()"
+      title="Add Makeup Student"
+      size="md"
+      (close)="closeMakeupModal()"
+    >
+      <div class="makeup-modal-content">
+        <p class="makeup-modal-note">Select a student from this batch to add as a makeup entry for {{ selectedDate() }}.</p>
+
+        <div class="makeup-search-box">
+          <i class="fa-solid fa-search"></i>
+          <input
+            type="text"
+            placeholder="Search by student name..."
+            [value]="makeupSearchQuery()"
+            (input)="onMakeupSearch($event)"
+          />
+        </div>
+
+        <div class="makeup-student-list">
+          @for (student of filteredMakeupStudents(); track student.studentId) {
+            <button
+              type="button"
+              class="makeup-student-item"
+              [class.selected]="selectedMakeupStudentId() === student.studentId"
+              (click)="selectMakeupStudent(student.studentId)"
+            >
+              <span class="student-name">{{ student.studentName }}</span>
+              @if (selectedMakeupStudentId() === student.studentId) {
+                <i class="fa-solid fa-check"></i>
+              }
+            </button>
+          } @empty {
+            <div class="makeup-empty-state">
+              <i class="fa-solid fa-users-slash"></i>
+              <p>No available students to add</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="makeup-modal-actions" slot="footer">
+        <app-button variant="outline" (clicked)="closeMakeupModal()">Cancel</app-button>
+        <app-button
+          variant="primary"
+          icon="fa-solid fa-plus"
+          [disabled]="!selectedMakeupStudentId()"
+          (clicked)="confirmAddMakeupStudent()"
+        >
+          Add Student
+        </app-button>
+      </div>
+    </app-modal>
   `,
   styles: [`
     .mark-attendance {
@@ -446,6 +502,91 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
       }
     }
 
+    .makeup-modal-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .makeup-modal-note {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .makeup-search-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--white);
+
+      i {
+        color: var(--text-muted);
+      }
+
+      input {
+        flex: 1;
+        border: none;
+        outline: none;
+        font-size: var(--font-size-base);
+      }
+    }
+
+    .makeup-student-list {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .makeup-student-item {
+      width: 100%;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--white);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-primary);
+      transition: all var(--transition-fast);
+
+      &:hover {
+        border-color: var(--primary-color);
+        background: var(--primary-light);
+      }
+
+      &.selected {
+        border-color: var(--primary-color);
+        background: var(--primary-light);
+      }
+    }
+
+    .makeup-empty-state {
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--text-muted);
+
+      i {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      p {
+        margin: 0;
+      }
+    }
+
+    .makeup-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
     .submit-section {
       display: flex;
       flex-direction: column;
@@ -561,6 +702,8 @@ export class MarkAttendanceComponent implements OnInit {
   backdateReason = signal('');
   showMakeupStudentModal = signal(false);
   allBatchStudents = signal<StudentAttendance[]>([]);
+  makeupSearchQuery = signal('');
+  selectedMakeupStudentId = signal<number | null>(null);
 
   // Computed
   selectedBatch = computed(() => {
@@ -573,6 +716,17 @@ export class MarkAttendanceComponent implements OnInit {
     if (!query) return this.students();
     return this.students().filter(s =>
       s.studentName.toLowerCase().includes(query)
+    );
+  });
+
+  filteredMakeupStudents = computed(() => {
+    const query = this.makeupSearchQuery().trim().toLowerCase();
+    if (!query) {
+      return this.allBatchStudents();
+    }
+
+    return this.allBatchStudents().filter(student =>
+      student.studentName.toLowerCase().includes(query)
     );
   });
 
@@ -662,11 +816,13 @@ export class MarkAttendanceComponent implements OnInit {
     this.selectedBatchId.set(null);
     this.students.set([]);
     this.searchQuery.set('');
+    this.closeMakeupModal();
   }
 
   onDateChange(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.selectedDate.set(input.value);
+    this.closeMakeupModal();
     const batchId = this.selectedBatchId();
     if (batchId) {
       this.loadStudents(batchId, input.value);
@@ -763,6 +919,8 @@ export class MarkAttendanceComponent implements OnInit {
         const currentStudentIds = new Set(this.students().map(s => s.studentId));
         const availableStudents = allStudents.filter(s => !currentStudentIds.has(s.studentId));
         this.allBatchStudents.set(availableStudents);
+        this.makeupSearchQuery.set('');
+        this.selectedMakeupStudentId.set(null);
         this.showMakeupStudentModal.set(true);
       },
       error: () => {
@@ -785,6 +943,35 @@ export class MarkAttendanceComponent implements OnInit {
       students.filter(s => s.studentId !== student.studentId)
     );
     this.toastService.info(`Added ${student.studentName} as makeup student`);
+  }
+
+  onMakeupSearch(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.makeupSearchQuery.set(input.value);
+  }
+
+  selectMakeupStudent(studentId: number): void {
+    this.selectedMakeupStudentId.set(studentId);
+  }
+
+  closeMakeupModal(): void {
+    this.showMakeupStudentModal.set(false);
+    this.makeupSearchQuery.set('');
+    this.selectedMakeupStudentId.set(null);
+  }
+
+  confirmAddMakeupStudent(): void {
+    const studentId = this.selectedMakeupStudentId();
+    if (!studentId) return;
+
+    const student = this.allBatchStudents().find(s => s.studentId === studentId);
+    if (!student) {
+      this.toastService.error('Selected student is not available');
+      return;
+    }
+
+    this.addMakeupStudent(student);
+    this.closeMakeupModal();
   }
 
   removeMakeupStudent(studentId: number): void {
