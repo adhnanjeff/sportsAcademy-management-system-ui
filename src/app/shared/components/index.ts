@@ -11,3 +11,5 @@ export * from './empty-state/empty-state.component';
 export * from './phone-input/phone-input.component';
 export * from './select/select.component';
 export * from './modal/modal.component';
+export * from './radar-chart/radar-chart.component';
+export * from './area-chart/area-chart.component';

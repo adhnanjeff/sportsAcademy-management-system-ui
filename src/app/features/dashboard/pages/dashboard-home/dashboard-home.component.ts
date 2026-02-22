@@ -10,6 +10,7 @@ import { BatchCardComponent } from '../../components/batch-card/batch-card.compo
 import { ActivityFeedComponent } from '../../components/activity-feed/activity-feed.component';
 import { QuickActionsComponent } from '../../components/quick-actions/quick-actions.component';
 import { SkeletonLoaderComponent } from '../../../../shared/components/skeleton-loader/skeleton-loader.component';
+import { AreaChartComponent } from '../../../../shared/components/area-chart/area-chart.component';
 import {
   DashboardStats,
   DashboardAttendanceTrendPoint,
@@ -19,12 +20,6 @@ import {
   QuickAction,
   Role
 } from '../../../../core/models';
-
-type DonutSegment = 'attended' | 'missed';
-
-interface TrendEntriesBar extends DashboardAttendanceTrendPoint {
-  heightPercent: number;
-}
 
 @Component({
   selector: 'app-dashboard-home',
@@ -38,7 +33,8 @@ interface TrendEntriesBar extends DashboardAttendanceTrendPoint {
     BatchCardComponent,
     ActivityFeedComponent,
     QuickActionsComponent,
-    SkeletonLoaderComponent
+    SkeletonLoaderComponent,
+    AreaChartComponent
   ],
   templateUrl: './dashboard-home.component.html',
   styleUrl: './dashboard-home.component.scss',
@@ -48,8 +44,6 @@ export class DashboardHomeComponent implements OnInit {
   private dashboardService = inject(DashboardService);
   private authService = inject(AuthService);
   private router = inject(Router);
-  private readonly donutRadius = 44;
-  readonly donutCircumference = 2 * Math.PI * this.donutRadius;
 
   isLoading = signal(true);
   isLoadingTrend = signal(false);
@@ -58,8 +52,6 @@ export class DashboardHomeComponent implements OnInit {
   recentBatches = signal<Batch[]>([]);
   recentActivity = signal<ActivityItem[]>([]);
   attendanceTrend = signal<DashboardAttendanceTrendPoint[]>([]);
-  hoveredDonutSegment = signal<DonutSegment | null>(null);
-  hoveredEntriesBar = signal<TrendEntriesBar | null>(null);
   quickActions = signal<QuickAction[]>([
     { id: 'attendance', label: 'Mark Attendance', icon: 'fa-solid fa-clipboard-check', route: '/dashboard/attendance/mark', color: 'var(--primary-color)' },
     { id: 'attendance-report', label: 'Attendance Report', icon: 'fa-regular fa-calendar-check', route: '/dashboard/attendance/history', color: 'var(--info-color)' },
@@ -94,29 +86,9 @@ export class DashboardHomeComponent implements OnInit {
     return Math.round((this.trendPresentEntries() * 100) / total);
   });
   trendMissedPercent = computed(() => Math.max(0, 100 - this.trendAttendancePercent()));
-  attendedDasharray = computed(() => {
-    const attendedLength = (this.trendAttendancePercent() / 100) * this.donutCircumference;
-    return `${attendedLength} ${this.donutCircumference}`;
-  });
-  missedDasharray = computed(() => {
-    const missedLength = (this.trendMissedPercent() / 100) * this.donutCircumference;
-    return `${missedLength} ${this.donutCircumference}`;
-  });
-  missedDashoffset = computed(() => -((this.trendAttendancePercent() / 100) * this.donutCircumference));
-  trendEntryBars = computed<TrendEntriesBar[]>(() => {
-    const trend = this.attendanceTrend();
-    if (trend.length === 0) return [];
-    const maxEntries = Math.max(...trend.map((point) => point.totalEntries), 1);
-    return trend.map((point) => ({
-      ...point,
-      heightPercent: Math.max(8, Math.round((point.totalEntries * 100) / maxEntries))
-    }));
-  });
-  hoveredEntriesBarIndex = computed(() => {
-    const hovered = this.hoveredEntriesBar();
-    if (!hovered) return -1;
-    return this.trendEntryBars().findIndex((bar) => bar.date === hovered.date);
-  });
+  trendLabels = computed(() => this.attendanceTrend().map((point) => point.label));
+  trendRateValues = computed(() => this.attendanceTrend().map((point) => point.attendanceRate));
+  attendanceRateValue = computed(() => `${this.trendAttendancePercent()}%`);
   trendStartLabel = computed(() => this.attendanceTrend()[0]?.label ?? '');
   trendEndLabel = computed(() => this.attendanceTrend()[this.attendanceTrend().length - 1]?.label ?? '');
   trendRangeText = computed(() => {
@@ -203,48 +175,6 @@ export class DashboardHomeComponent implements OnInit {
 
   onQuickAction(action: QuickAction): void {
     console.log('Quick action:', action);
-  }
-
-  onDonutSegmentHover(segment: DonutSegment): void {
-    this.hoveredDonutSegment.set(segment);
-  }
-
-  onDonutLeave(): void {
-    this.hoveredDonutSegment.set(null);
-  }
-
-  onEntriesBarHover(bar: TrendEntriesBar): void {
-    this.hoveredEntriesBar.set(bar);
-  }
-
-  onEntriesBarLeave(): void {
-    this.hoveredEntriesBar.set(null);
-  }
-
-  donutTooltipText(): string {
-    const segment = this.hoveredDonutSegment();
-    if (segment === 'attended') {
-      return `Attended: ${this.trendPresentEntries()} entries (${this.trendAttendancePercent()}%)`;
-    }
-
-    if (segment === 'missed') {
-      return `Missed: ${this.trendMissedEntries()} entries (${this.trendMissedPercent()}%)`;
-    }
-
-    return '';
-  }
-
-  entriesTooltipLeftPercent(): number {
-    const index = this.hoveredEntriesBarIndex();
-    const bars = this.trendEntryBars();
-    if (index < 0 || bars.length === 0) return 50;
-    return ((index + 0.5) / bars.length) * 100;
-  }
-
-  entriesTooltipTopPercent(): number {
-    const hovered = this.hoveredEntriesBar();
-    if (!hovered) return 50;
-    return Math.max(8, 100 - hovered.heightPercent);
   }
 
   private loadAttendanceTrend(): void {

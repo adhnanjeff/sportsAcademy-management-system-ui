@@ -6,3 +6,5 @@ export * from './batch.model';
 export * from './attendance.model';
 export * from './achievement.model';
 export * from './dashboard.model';
+export * from './match.model';
+export * from './performance.model';

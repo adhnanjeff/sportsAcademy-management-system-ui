@@ -74,7 +74,7 @@
       />
       <app-stat-card
         label="Attendance Rate"
-        [value]="'95%'"
+        [value]="attendanceRateValue()"
         icon="fa-solid fa-chart-line"
         accentColor="var(--info-color)"
       />
@@ -120,80 +120,33 @@
             </div>
 
             <div class="trend-chart-wrap">
-              <div class="chart-panel">
+              <div class="chart-panel chart-panel-wide">
                 <div class="chart-panel-header">
-                  <h4>Attendance Quality</h4>
-                  <span>Hover segments for details</span>
+                  <h4>Attendance Rate Area Trend</h4>
+                  <span>Chart.js</span>
                 </div>
 
-                <div class="trend-donut-chart">
-                  <svg class="donut-svg" viewBox="0 0 120 120" (mouseleave)="onDonutLeave()">
-                    <g transform="translate(60,60) rotate(-90) translate(-60,-60)">
-                      <circle class="donut-track" cx="60" cy="60" r="44"></circle>
-                      <circle
-                        class="donut-segment attended"
-                        cx="60"
-                        cy="60"
-                        r="44"
-                        [attr.stroke-dasharray]="attendedDasharray()"
-                        (mouseenter)="onDonutSegmentHover('attended')"
-                      ></circle>
-                      <circle
-                        class="donut-segment missed"
-                        cx="60"
-                        cy="60"
-                        r="44"
-                        [attr.stroke-dasharray]="missedDasharray()"
-                        [attr.stroke-dashoffset]="missedDashoffset()"
-                        (mouseenter)="onDonutSegmentHover('missed')"
-                      ></circle>
-                    </g>
-                  </svg>
+                <app-area-chart
+                  [labels]="trendLabels()"
+                  [values]="trendRateValues()"
+                  datasetLabel="Attendance Rate"
+                  [minY]="0"
+                  [maxY]="100"
+                />
 
-                  <div class="trend-donut-inner">
-                    <strong>{{ trendAttendancePercent() }}%</strong>
-                    <span>Attended</span>
+                <div class="trend-breakdown">
+                  <div class="breakdown-chip attended">
+                    <span class="chip-label">Present Entries</span>
+                    <strong class="chip-value">{{ trendPresentEntries() }}</strong>
                   </div>
-
-                  @if (hoveredDonutSegment()) {
-                    <div class="floating-tooltip donut-tooltip">
-                      {{ donutTooltipText() }}
-                    </div>
-                  }
-                </div>
-              </div>
-
-              <div class="chart-panel">
-                <div class="chart-panel-header">
-                  <h4>Daily Marked Entries</h4>
-                  <span>Hover bars for details</span>
-                </div>
-
-                <div class="entries-chart" (mouseleave)="onEntriesBarLeave()">
-                  @for (bar of trendEntryBars(); track bar.date) {
-                    <div class="entry-bar-wrap" (mouseenter)="onEntriesBarHover(bar)">
-                      <div
-                        class="entry-bar"
-                        [class.active]="hoveredEntriesBar()?.date === bar.date"
-                        [style.height.%]="bar.heightPercent"
-                      ></div>
-                    </div>
-                  }
-
-                  @if (hoveredEntriesBar()) {
-                    <div
-                      class="floating-tooltip entries-tooltip"
-                      [style.left.%]="entriesTooltipLeftPercent()"
-                      [style.top.%]="entriesTooltipTopPercent()"
-                    >
-                      {{ hoveredEntriesBar()!.label }}: {{ hoveredEntriesBar()!.totalEntries }} entries
-                    </div>
-                  }
-                </div>
-
-                <div class="entries-axis-labels">
-                  <span>{{ trendStartLabel() }}</span>
-                  <span>{{ trendEndLabel() }}</span>
+                  <div class="breakdown-chip missed">
+                    <span class="chip-label">Missed Entries</span>
+                    <strong class="chip-value">{{ trendMissedEntries() }}</strong>
+                  </div>
+                  <div class="breakdown-chip">
+                    <span class="chip-label">Range</span>
+                    <strong class="chip-value">{{ trendStartLabel() }} - {{ trendEndLabel() }}</strong>
+                  </div>
                 </div>
               </div>
             </div>
