@@ -252,6 +252,34 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
             </div>
           }
         </div>
+
+        @if (selectedMakeupStudentId()) {
+          <div class="makeup-compensates-field">
+            <label for="makeup-compensates-date">
+              Compensates for missed date <span class="required">*</span>
+            </label>
+
+            @if (isLoadingEligibleAbsences()) {
+              <p class="makeup-field-message">Loading eligible absences...</p>
+            } @else if (eligibleAbsenceDates().length === 0) {
+              <p class="makeup-field-message warning">
+                No eligible absence found for this student in the allowed window.
+              </p>
+            } @else {
+              <select
+                id="makeup-compensates-date"
+                class="makeup-date-select"
+                [value]="selectedCompensatesForDate() || ''"
+                (change)="onCompensatesForDateChange($event)"
+              >
+                <option value="" disabled>Select missed date</option>
+                @for (date of eligibleAbsenceDates(); track date) {
+                  <option [value]="date">{{ date }}</option>
+                }
+              </select>
+            }
+          </div>
+        }
       </div>
 
       <div class="makeup-modal-actions" slot="footer">
@@ -259,7 +287,7 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
         <app-button
           variant="primary"
           icon="fa-solid fa-plus"
-          [disabled]="!selectedMakeupStudentId()"
+          [disabled]="!selectedMakeupStudentId() || isLoadingEligibleAbsences() || !selectedCompensatesForDate()"
           (clicked)="confirmAddMakeupStudent()"
         >
           Add Student
@@ -587,6 +615,45 @@ import { AttendanceSummaryComponent } from '../../components/attendance-summary/
       gap: 8px;
     }
 
+    .makeup-compensates-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      label {
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .required {
+        color: var(--error-color);
+      }
+    }
+
+    .makeup-date-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: var(--font-size-base);
+      background: var(--white);
+
+      &:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+    }
+
+    .makeup-field-message {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: var(--font-size-sm);
+
+      &.warning {
+        color: var(--warning-color);
+      }
+    }
+
     .submit-section {
       display: flex;
       flex-direction: column;
@@ -704,6 +771,9 @@ export class MarkAttendanceComponent implements OnInit {
   allBatchStudents = signal<StudentAttendance[]>([]);
   makeupSearchQuery = signal('');
   selectedMakeupStudentId = signal<number | null>(null);
+  isLoadingEligibleAbsences = signal(false);
+  eligibleAbsenceDates = signal<string[]>([]);
+  selectedCompensatesForDate = signal<string | null>(null);
 
   // Computed
   selectedBatch = computed(() => {
@@ -921,6 +991,9 @@ export class MarkAttendanceComponent implements OnInit {
         this.allBatchStudents.set(availableStudents);
         this.makeupSearchQuery.set('');
         this.selectedMakeupStudentId.set(null);
+        this.eligibleAbsenceDates.set([]);
+        this.selectedCompensatesForDate.set(null);
+        this.isLoadingEligibleAbsences.set(false);
         this.showMakeupStudentModal.set(true);
       },
       error: () => {
@@ -929,11 +1002,12 @@ export class MarkAttendanceComponent implements OnInit {
     });
   }
 
-  addMakeupStudent(student: StudentAttendance): void {
+  addMakeupStudent(student: StudentAttendance, compensatesForDate: string): void {
     // Add the student as a makeup entry
     const makeupStudent: StudentAttendance = {
       ...student,
       entryType: AttendanceEntryType.MAKEUP,
+      compensatesForDate,
       status: AttendanceStatus.PRESENT,
       isMarked: false
     };
@@ -952,16 +1026,50 @@ export class MarkAttendanceComponent implements OnInit {
 
   selectMakeupStudent(studentId: number): void {
     this.selectedMakeupStudentId.set(studentId);
+    this.selectedCompensatesForDate.set(null);
+    this.eligibleAbsenceDates.set([]);
+
+    const batchId = this.selectedBatchId();
+    if (!batchId) {
+      return;
+    }
+
+    this.isLoadingEligibleAbsences.set(true);
+    this.attendanceService.getEligibleAbsencesForMakeup(studentId, batchId).subscribe({
+      next: (absences) => {
+        if (this.selectedMakeupStudentId() !== studentId) {
+          return;
+        }
+
+        const dates = absences
+          .map(absence => absence.date)
+          .sort((a, b) => b.localeCompare(a));
+        this.eligibleAbsenceDates.set(dates);
+        this.selectedCompensatesForDate.set(dates.length === 1 ? dates[0] : null);
+        this.isLoadingEligibleAbsences.set(false);
+      },
+      error: () => {
+        if (this.selectedMakeupStudentId() !== studentId) {
+          return;
+        }
+        this.isLoadingEligibleAbsences.set(false);
+        this.toastService.error('Failed to load eligible absences');
+      }
+    });
   }
 
   closeMakeupModal(): void {
     this.showMakeupStudentModal.set(false);
     this.makeupSearchQuery.set('');
     this.selectedMakeupStudentId.set(null);
+    this.eligibleAbsenceDates.set([]);
+    this.selectedCompensatesForDate.set(null);
+    this.isLoadingEligibleAbsences.set(false);
   }
 
   confirmAddMakeupStudent(): void {
     const studentId = this.selectedMakeupStudentId();
+    const compensatesForDate = this.selectedCompensatesForDate();
     if (!studentId) return;
 
     const student = this.allBatchStudents().find(s => s.studentId === studentId);
@@ -970,8 +1078,18 @@ export class MarkAttendanceComponent implements OnInit {
       return;
     }
 
-    this.addMakeupStudent(student);
+    if (!compensatesForDate) {
+      this.toastService.error('Please select the missed date being compensated');
+      return;
+    }
+
+    this.addMakeupStudent(student, compensatesForDate);
     this.closeMakeupModal();
+  }
+
+  onCompensatesForDateChange(event: Event): void {
+    const input = event.target as HTMLSelectElement;
+    this.selectedCompensatesForDate.set(input.value || null);
   }
 
   removeMakeupStudent(studentId: number): void {
