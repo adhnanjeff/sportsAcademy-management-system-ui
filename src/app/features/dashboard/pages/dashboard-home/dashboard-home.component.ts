@@ -44,6 +44,7 @@ export class DashboardHomeComponent implements OnInit {
   private dashboardService = inject(DashboardService);
   private authService = inject(AuthService);
   private router = inject(Router);
+  readonly trendWindowDays = 14;
 
   isLoading = signal(true);
   isLoadingTrend = signal(false);
@@ -68,14 +69,15 @@ export class DashboardHomeComponent implements OnInit {
     const role = this.authService.currentUser()?.role;
     return role === Role.ADMIN || role === Role.COACH;
   });
+  trendActivePoints = computed(() => this.attendanceTrend().filter((point) => point.totalEntries > 0));
   trendAverageRate = computed(() => {
-    const trend = this.attendanceTrend();
+    const trend = this.trendActivePoints();
     if (trend.length === 0) return 0;
     const totalRate = trend.reduce((sum, point) => sum + point.attendanceRate, 0);
     return Math.round(totalRate / trend.length);
   });
-  trendTotalEntries = computed(() => this.attendanceTrend().reduce((sum, point) => sum + point.totalEntries, 0));
-  trendPresentEntries = computed(() => this.attendanceTrend().reduce(
+  trendTotalEntries = computed(() => this.trendActivePoints().reduce((sum, point) => sum + point.totalEntries, 0));
+  trendPresentEntries = computed(() => this.trendActivePoints().reduce(
     (sum, point) => sum + Math.round((point.attendanceRate * point.totalEntries) / 100),
     0
   ));
@@ -86,9 +88,11 @@ export class DashboardHomeComponent implements OnInit {
     return Math.round((this.trendPresentEntries() * 100) / total);
   });
   trendMissedPercent = computed(() => Math.max(0, 100 - this.trendAttendancePercent()));
-  trendLabels = computed(() => this.attendanceTrend().map((point) => point.label));
-  trendRateValues = computed(() => this.attendanceTrend().map((point) => point.attendanceRate));
   attendanceRateValue = computed(() => `${this.trendAttendancePercent()}%`);
+  trendLabels = computed(() => this.attendanceTrend().map((point) => point.label));
+  trendRateValues = computed(() =>
+    this.attendanceTrend().map((point) => (point.totalEntries > 0 ? point.attendanceRate : null))
+  );
   trendStartLabel = computed(() => this.attendanceTrend()[0]?.label ?? '');
   trendEndLabel = computed(() => this.attendanceTrend()[this.attendanceTrend().length - 1]?.label ?? '');
   trendRangeText = computed(() => {
@@ -179,7 +183,7 @@ export class DashboardHomeComponent implements OnInit {
 
   private loadAttendanceTrend(): void {
     this.isLoadingTrend.set(true);
-    this.dashboardService.getAttendanceTrend(14).subscribe({
+    this.dashboardService.getAttendanceTrend(this.trendWindowDays).subscribe({
       next: (trend) => {
         this.attendanceTrend.set(trend);
         this.isLoadingTrend.set(false);

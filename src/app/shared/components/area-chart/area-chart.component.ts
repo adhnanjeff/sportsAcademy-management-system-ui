@@ -55,13 +55,13 @@ export class AreaChartComponent implements AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('areaCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
   @Input() labels: string[] = [];
-  @Input() values: number[] = [];
+  @Input() values: Array<number | null> = [];
   @Input() datasetLabel = 'Trend';
   @Input() maxY = 100;
   @Input() minY = 0;
 
   private readonly platformId = inject(PLATFORM_ID);
-  private chart: Chart<'line', number[], string> | null = null;
+  private chart: Chart<'line', Array<number | null>, string> | null = null;
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
@@ -121,7 +121,7 @@ export class AreaChartComponent implements AfterViewInit, OnChanges, OnDestroy {
     gradient.addColorStop(0, 'rgba(37, 99, 235, 0.40)');
     gradient.addColorStop(1, 'rgba(37, 99, 235, 0.03)');
 
-    const config: ChartConfiguration<'line', number[], string> = {
+    const config: ChartConfiguration<'line', Array<number | null>, string> = {
       type: 'line',
       data: {
         labels,
@@ -194,7 +194,7 @@ export class AreaChartComponent implements AfterViewInit, OnChanges, OnDestroy {
     };
 
     if (!this.chart) {
-      this.chart = new Chart<'line', number[], string>(canvas, config);
+      this.chart = new Chart<'line', Array<number | null>, string>(canvas, config);
       return;
     }
 
@@ -212,11 +212,14 @@ export class AreaChartComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.chart.update();
   }
 
-  private normalizeValues(values: number[], expectedLength: number): number[] {
+  private normalizeValues(values: Array<number | null>, expectedLength: number): Array<number | null> {
     return Array.from({ length: expectedLength }, (_, index) => {
-      const value = values[index] ?? 0;
+      const value = values[index];
+      if (value === null || value === undefined) {
+        return null;
+      }
       if (!Number.isFinite(value)) {
-        return 0;
+        return null;
       }
       return Math.max(this.minY, Math.min(value, this.maxY));
     });

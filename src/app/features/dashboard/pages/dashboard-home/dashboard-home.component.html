@@ -92,13 +92,13 @@
 
     <section class="dashboard-top-grid animate-fade-in-up stagger-3" [class.only-batches]="!canViewTrendChart()">
       @if (canViewTrendChart()) {
-        <app-card title="Attendance Trend (Last 14 Days)" icon="fa-solid fa-chart-area" [fullHeight]="true">
+        <app-card [title]="'Attendance Trend (Last ' + trendWindowDays + ' Days)'" icon="fa-solid fa-chart-area" [fullHeight]="true">
           @if (isLoadingTrend()) {
             <app-skeleton-loader type="stats" [count]="3" />
             <div class="trend-loading-chart">
               <app-skeleton-loader type="card" [count]="1" />
             </div>
-          } @else if (attendanceTrend().length === 0) {
+          } @else if (trendTotalEntries() === 0) {
             <div class="trend-empty">
               <i class="fa-regular fa-chart-bar"></i>
               <p>No attendance trend data available yet.</p>
@@ -131,7 +131,7 @@
                   [values]="trendRateValues()"
                   datasetLabel="Attendance Rate"
                   [minY]="0"
-                  [maxY]="100"
+                  [maxY]="120"
                 />
 
                 <div class="trend-breakdown">
