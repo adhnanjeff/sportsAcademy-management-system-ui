@@ -96,10 +96,14 @@ import { Student, AchievementType, AchievementCreateRequest } from '../../../../
                 <label for="type">Achievement Type <span class="required">*</span></label>
                 <select id="type" [(ngModel)]="achievementForm.type" class="form-select">
                   <option value="">Select type</option>
-                  <option value="TOURNAMENT">Tournament</option>
-                  <option value="COMPETITION">Competition</option>
-                  <option value="CERTIFICATION">Certification</option>
-                  <option value="MILESTONE">Milestone</option>
+                  <option value="TOURNAMENT_WIN">Tournament Win</option>
+                  <option value="TOURNAMENT_RUNNER_UP">Tournament Runner-up</option>
+                  <option value="MEDAL">Medal</option>
+                  <option value="CERTIFICATE">Certificate</option>
+                  <option value="SKILL_MILESTONE">Skill Milestone</option>
+                  <option value="ATTENDANCE_AWARD">Attendance Award</option>
+                  <option value="IMPROVEMENT_AWARD">Improvement Award</option>
+                  <option value="CHAMPIONSHIP">Championship</option>
                   <option value="OTHER">Other</option>
                 </select>
               </div>
@@ -483,7 +487,7 @@ import { Student, AchievementType, AchievementCreateRequest } from '../../../../
 export class AddAchievementDialogComponent implements OnInit {
   @Input() isOpen = false;
   @Output() close = new EventEmitter<void>();
-  @Output() achievementAdded = new EventEmitter<AchievementCreateRequest>();
+  @Output() achievementAdded = new EventEmitter<{ request: AchievementCreateRequest; file: File | null }>();
 
   private studentService = inject(StudentService);
 
@@ -502,8 +506,7 @@ export class AddAchievementDialogComponent implements OnInit {
     eventName: '',
     position: '',
     description: '',
-    awardedBy: '',
-    certificateUrl: ''
+    awardedBy: ''
   };
 
   filteredStudents = computed(() => {
@@ -574,7 +577,6 @@ export class AddAchievementDialogComponent implements OnInit {
   removeImage(): void {
     this.previewImageUrl.set(null);
     this.selectedFile.set(null);
-    this.achievementForm.certificateUrl = '';
   }
 
   isFormValid(): boolean {
@@ -599,12 +601,10 @@ export class AddAchievementDialogComponent implements OnInit {
       description: this.achievementForm.description,
       eventName: this.achievementForm.eventName,
       position: this.achievementForm.position,
-      awardedBy: this.achievementForm.awardedBy,
-      // For now, we'll use the preview URL. In production, this would be uploaded to S3
-      certificateUrl: this.previewImageUrl() || undefined
+      awardedBy: this.achievementForm.awardedBy
     };
 
-    this.achievementAdded.emit(request);
+    this.achievementAdded.emit({ request, file: this.selectedFile() });
   }
 
   onClose(): void {
@@ -626,13 +626,7 @@ export class AddAchievementDialogComponent implements OnInit {
       eventName: '',
       position: '',
       description: '',
-      awardedBy: '',
-      certificateUrl: ''
+      awardedBy: ''
     };
-  }
-
-  finishSubmitting(): void {
-    this.isSubmitting.set(false);
-    this.onClose();
   }
 }

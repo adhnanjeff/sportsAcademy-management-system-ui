@@ -67,8 +67,15 @@ export class AchievementService {
     );
   }
 
-  createAchievement(request: AchievementCreateRequest): Observable<Achievement> {
-    return this.apiService.post<Achievement>('/achievements', request).pipe(
+  createAchievement(request: AchievementCreateRequest, certificate?: File): Observable<Achievement> {
+    const formData = new FormData();
+    formData.append('achievement', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    
+    if (certificate) {
+      formData.append('certificate', certificate);
+    }
+
+    return this.apiService.post<Achievement>('/achievements', formData).pipe(
       map(response => {
         this.cache.deleteByPrefix('GET:/achievements');
         return response;
@@ -76,8 +83,15 @@ export class AchievementService {
     );
   }
 
-  updateAchievement(id: number, request: AchievementCreateRequest): Observable<Achievement> {
-    return this.apiService.put<Achievement>(`/achievements/${id}`, request).pipe(
+  updateAchievement(id: number, request: AchievementCreateRequest, certificate?: File): Observable<Achievement> {
+    const formData = new FormData();
+    formData.append('achievement', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    
+    if (certificate) {
+      formData.append('certificate', certificate);
+    }
+
+    return this.apiService.put<Achievement>(`/achievements/${id}`, formData).pipe(
       map(response => {
         this.cache.deleteByPrefix('GET:/achievements');
         return response;

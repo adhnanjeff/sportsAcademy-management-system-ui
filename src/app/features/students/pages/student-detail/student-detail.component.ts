@@ -1547,15 +1547,22 @@ export class StudentDetailComponent implements OnInit {
   }
 
   formatAchievementType(type: string): string {
-    return type.charAt(0) + type.slice(1).toLowerCase();
+    // Convert TOURNAMENT_WIN to "Tournament Win"
+    return type.replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, char => char.toUpperCase());
   }
 
   getAchievementIcon(type: string): string {
     const icons: Record<string, string> = {
-      'TOURNAMENT': 'fa-solid fa-trophy',
-      'COMPETITION': 'fa-solid fa-medal',
-      'CERTIFICATION': 'fa-solid fa-certificate',
-      'MILESTONE': 'fa-solid fa-star',
+      'TOURNAMENT_WIN': 'fa-solid fa-trophy',
+      'TOURNAMENT_RUNNER_UP': 'fa-solid fa-medal',
+      'MEDAL': 'fa-solid fa-medal',
+      'CERTIFICATE': 'fa-solid fa-certificate',
+      'SKILL_MILESTONE': 'fa-solid fa-star',
+      'ATTENDANCE_AWARD': 'fa-solid fa-calendar-check',
+      'IMPROVEMENT_AWARD': 'fa-solid fa-chart-line',
+      'CHAMPIONSHIP': 'fa-solid fa-crown',
       'OTHER': 'fa-solid fa-award'
     };
     return icons[type] || 'fa-solid fa-award';

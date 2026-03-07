@@ -131,8 +131,43 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
         <div class="achievements-grid">
           @for (achievement of filteredAchievements(); track achievement.id) {
             <div class="achievement-card" [class.verified]="achievement.isVerified">
+              <!-- Instagram-style Header -->
+              <div class="card-header">
+                <div class="header-left">
+                  <div class="student-avatar">
+                    <i class="fa-solid fa-user"></i>
+                  </div>
+                  <div class="header-info">
+                    <a [routerLink]="['/dashboard/students', achievement.studentId]" class="student-name">
+                      {{ achievement.studentName }}
+                    </a>
+                    <span class="achievement-date">{{ achievement.achievedDate | date:'MMM d, y' }}</span>
+                  </div>
+                </div>
+                <div class="header-right">
+                  @if (canManageAchievements()) {
+                    <div class="dropdown-menu">
+                      <button class="menu-trigger" (click)="toggleMenu(achievement.id)">
+                        <i class="fa-solid fa-ellipsis"></i>
+                      </button>
+                      @if (openMenuId() === achievement.id) {
+                        <div class="menu-dropdown">
+                          <button class="menu-item" (click)="editAchievement(achievement); closeMenu()">
+                            <i class="fa-solid fa-edit"></i> Edit
+                          </button>
+                          <button class="menu-item danger" (click)="confirmDelete(achievement); closeMenu()">
+                            <i class="fa-solid fa-trash"></i> Delete
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Image -->
               @if (achievement.certificateUrl) {
-                <div class="achievement-image">
+                <div class="achievement-image" (click)="openImageViewer(achievement.certificateUrl, achievement.title)">
                   <img [src]="achievement.certificateUrl" [alt]="achievement.title" />
                 </div>
               } @else {
@@ -140,76 +175,39 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
                   <i [class]="getTypeIcon(achievement.type)"></i>
                 </div>
               }
-              
-              <div class="achievement-content">
-                <div class="achievement-header">
+
+              <!-- Actions Row -->
+              <div class="card-actions">
+                <div class="action-buttons">
+                  @if (achievement.isVerified) {
+                    <span class="verified-badge">
+                      <i class="fa-solid fa-check-circle"></i>
+                    </span>
+                  }
                   <app-badge
                     [text]="formatType(achievement.type)"
                     [variant]="getTypeBadgeVariant(achievement.type)"
                   />
-                  @if (achievement.isVerified) {
-                    <span class="verified-badge">
-                      <i class="fa-solid fa-check-circle"></i> Verified
-                    </span>
-                  } @else {
-                    <span class="pending-badge">
-                      <i class="fa-solid fa-clock"></i> Pending
-                    </span>
-                  }
                 </div>
+                <button class="view-student-btn" [routerLink]="['/dashboard/students', achievement.studentId]">
+                  <i class="fa-solid fa-external-link"></i>
+                  View Student
+                </button>
+              </div>
 
+              <!-- Content/Caption -->
+              <div class="card-content">
                 <h3 class="achievement-title">{{ achievement.title }}</h3>
-                
-                <a [routerLink]="['/dashboard/students', achievement.studentId]" class="student-link">
-                  <i class="fa-solid fa-user"></i>
-                  {{ achievement.studentName }}
-                </a>
-
                 @if (achievement.eventName) {
-                  <p class="achievement-event">
-                    <i class="fa-solid fa-flag"></i>
-                    {{ achievement.eventName }}
-                  </p>
+                  <p class="achievement-event">{{ achievement.eventName }}</p>
                 }
-
                 @if (achievement.position) {
                   <p class="achievement-position">
-                    <i class="fa-solid fa-medal"></i>
-                    {{ achievement.position }}
+                    <i class="fa-solid fa-medal"></i> {{ achievement.position }}
                   </p>
                 }
-
-                <div class="achievement-footer">
-                  <span class="achievement-date">
-                    <i class="fa-regular fa-calendar"></i>
-                    {{ achievement.achievedDate | date:'MMM d, y' }}
-                  </span>
-                  @if (achievement.awardedBy) {
-                    <span class="awarded-by">by {{ achievement.awardedBy }}</span>
-                  }
-                </div>
-
-                @if (canManageAchievements()) {
-                  <div class="achievement-actions">
-                    @if (!achievement.isVerified) {
-                      <app-button
-                        variant="outline"
-                        size="sm"
-                        icon="fa-solid fa-check"
-                        (clicked)="verifyAchievement(achievement)"
-                      >
-                        Verify
-                      </app-button>
-                    }
-                    <app-button
-                      variant="ghost"
-                      size="sm"
-                      icon="fa-solid fa-eye"
-                      [routerLink]="['/dashboard/students', achievement.studentId]"
-                    >
-                      View Student
-                    </app-button>
-                  </div>
+                @if (achievement.awardedBy) {
+                  <p class="awarded-by">Awarded by {{ achievement.awardedBy }}</p>
                 }
               </div>
             </div>
@@ -223,6 +221,47 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       (close)="closeAddDialog()"
       (achievementAdded)="onAchievementAdded($event)"
     />
+
+    <!-- Delete Confirmation Modal -->
+    <app-modal
+      [isOpen]="showDeleteDialog()"
+      title=""
+      size="sm"
+      (close)="cancelDelete()"
+    >
+      <div class="delete-dialog">
+        <div class="delete-dialog-icon">
+          <i class="fa-solid fa-trash"></i>
+        </div>
+        <h2>Delete Achievement?</h2>
+        <p class="delete-dialog-text">
+          You're about to delete <strong>"{{ achievementToDelete()?.title }}"</strong>.
+          This action cannot be undone.
+        </p>
+        <div class="delete-dialog-actions">
+          <button class="btn-cancel" (click)="cancelDelete()">Cancel</button>
+          <button class="btn-delete" (click)="confirmDeleteAction()">
+            <i class="fa-solid fa-trash"></i>
+            Delete
+          </button>
+        </div>
+      </div>
+    </app-modal>
+
+    <!-- Image Viewer Modal -->
+    @if (showImageViewer()) {
+      <div class="image-viewer-backdrop" (click)="closeImageViewer()">
+        <div class="image-viewer-container" (click)="$event.stopPropagation()">
+          <button class="close-viewer" (click)="closeImageViewer()">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+          <div class="image-viewer-content">
+            <img [src]="viewedImage()?.url" [alt]="viewedImage()?.title" />
+            <div class="image-viewer-title">{{ viewedImage()?.title }}</div>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .achievements-page {
@@ -308,9 +347,12 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
     }
 
     .achievements-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      max-width: 600px;
+      margin: 0 auto;
     }
 
     .achievement-card {
@@ -319,10 +361,10 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       border-radius: var(--border-radius-lg);
       overflow: hidden;
       transition: all var(--transition-fast);
+      width: 100%;
 
       &:hover {
         box-shadow: var(--shadow-md);
-        transform: translateY(-2px);
       }
 
       &.verified {
@@ -330,119 +372,327 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       }
     }
 
+    /* Instagram-style Header */
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .student-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      i {
+        color: white;
+        font-size: 16px;
+      }
+    }
+
+    .header-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .student-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-primary);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--primary-color);
+      }
+    }
+
+    .achievement-date {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-right {
+      position: relative;
+    }
+
+    .dropdown-menu {
+      position: relative;
+    }
+
+    .menu-trigger {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease;
+
+      i {
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+
+      &:hover {
+        background: var(--gray-100);
+      }
+    }
+
+    .menu-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: var(--white);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-lg);
+      min-width: 140px;
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 14px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-primary);
+      transition: background 0.15s ease;
+
+      i {
+        width: 16px;
+        color: var(--text-muted);
+      }
+
+      &:hover {
+        background: var(--gray-50);
+      }
+
+      &.danger {
+        color: var(--danger-color);
+
+        i {
+          color: var(--danger-color);
+        }
+
+        &:hover {
+          background: #fef2f2;
+        }
+      }
+    }
+
     .achievement-image {
-      height: 180px;
+      width: 100%;
       overflow: hidden;
       background: var(--gray-100);
+      cursor: pointer;
 
       img {
         width: 100%;
-        height: 100%;
-        object-fit: cover;
+        height: auto;
+        display: block;
+        transition: opacity 0.2s ease;
+      }
+
+      &:hover {
+        img {
+          opacity: 0.95;
+        }
       }
 
       &.placeholder {
+        height: 250px;
         display: flex;
         align-items: center;
         justify-content: center;
+        cursor: default;
 
         i {
-          font-size: 48px;
+          font-size: 64px;
           color: var(--gray-300);
         }
       }
     }
 
-    .achievement-content {
-      padding: 16px;
+    /* Actions Row */
+    .card-actions {
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .action-buttons {
+      display: flex;
+      align-items: center;
       gap: 10px;
     }
 
-    .achievement-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
     .verified-badge {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: var(--font-size-xs);
       color: var(--success-color);
-      font-weight: 600;
+      font-size: 20px;
     }
 
-    .pending-badge {
+    .view-student-btn {
       display: flex;
       align-items: center;
-      gap: 4px;
-      font-size: var(--font-size-xs);
-      color: var(--warning-color);
-      font-weight: 600;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--gray-50);
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+      }
+    }
+
+    /* Content/Caption */
+    .card-content {
+      padding: 12px 16px 16px;
     }
 
     .achievement-title {
-      font-size: var(--font-size-lg);
+      font-size: 15px;
       font-weight: 600;
       color: var(--text-primary);
-      margin: 0;
+      margin: 0 0 6px 0;
     }
 
-    .student-link {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: var(--font-size-sm);
-      color: var(--primary-color);
-      text-decoration: none;
-      font-weight: 500;
-
-      &:hover {
-        text-decoration: underline;
-      }
+    .achievement-event {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 0 0 4px 0;
     }
 
-    .achievement-event,
     .achievement-position {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: var(--font-size-sm);
+      gap: 6px;
+      font-size: 13px;
       color: var(--text-secondary);
-      margin: 0;
+      margin: 0 0 4px 0;
 
       i {
-        color: var(--text-muted);
-        width: 16px;
+        color: #f59e0b;
+        font-size: 14px;
       }
     }
 
-    .achievement-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-top: 10px;
-      border-top: 1px solid var(--border-color);
-      font-size: var(--font-size-xs);
+    .awarded-by {
+      font-size: 12px;
       color: var(--text-muted);
+      margin: 6px 0 0 0;
     }
 
-    .achievement-date {
+    /* Delete Dialog - Clean and Simple */
+    .delete-dialog {
+      text-align: center;
+      padding: 24px;
+    }
+
+    .delete-dialog-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: #fef2f2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      i {
+        font-size: 24px;
+        color: #ef4444;
+      }
+    }
+
+    .delete-dialog h2 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .delete-dialog-text {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+      margin: 0 0 20px 0;
+
+      strong {
+        color: var(--text-primary);
+      }
+    }
+
+    .delete-dialog-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn-cancel {
+      padding: 10px 24px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--white);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-300);
+      }
+    }
+
+    .btn-delete {
       display: flex;
       align-items: center;
       gap: 6px;
-    }
+      padding: 10px 24px;
+      border: none;
+      border-radius: var(--border-radius);
+      background: #ef4444;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: white;
+      transition: all 0.2s ease;
 
-    .achievement-actions {
-      display: flex;
-      gap: 8px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border-color);
-      margin-top: 4px;
+      &:hover {
+        background: #dc2626;
+      }
     }
 
     .empty-state-container {
@@ -580,6 +830,83 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       }
     }
 
+    .image-viewer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .image-viewer-container {
+      position: relative;
+      max-width: 90vw;
+      max-height: 90vh;
+      animation: zoomIn 0.3s ease;
+    }
+
+    .image-viewer-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+
+      img {
+        max-width: 100%;
+        max-height: 80vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    .image-viewer-title {
+      color: white;
+      font-size: 18px;
+      font-weight: 500;
+      text-align: center;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .close-viewer {
+      position: absolute;
+      top: -50px;
+      right: 0;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: scale(1.1);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes zoomIn {
+      from { transform: scale(0.9); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-8px); }
@@ -592,7 +919,8 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
 
     @media (max-width: 768px) {
       .achievements-grid {
-        grid-template-columns: 1fr;
+        max-width: 100%;
+        padding: 0;
       }
 
       .filters-section {
@@ -611,6 +939,48 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       .empty-features {
         gap: 18px;
       }
+
+      .delete-dialog {
+        padding: 20px;
+      }
+
+      .delete-dialog-actions {
+        flex-direction: column;
+
+        .btn-cancel, .btn-delete {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+
+      .card-actions {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .view-student-btn {
+        justify-content: center;
+      }
+
+      .image-viewer-backdrop {
+        padding: 10px;
+      }
+
+      .close-viewer {
+        top: -40px;
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+      }
+
+      .image-viewer-title {
+        font-size: 16px;
+      }
+
+      .image-viewer-content img {
+        max-height: 70vh;
+      }
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -624,6 +994,11 @@ export class AchievementsComponent implements OnInit {
   achievements = signal<Achievement[]>([]);
   searchQuery = signal('');
   showAddDialog = signal(false);
+  showDeleteDialog = signal(false);
+  achievementToDelete = signal<Achievement | null>(null);
+  showImageViewer = signal(false);
+  viewedImage = signal<{ url: string; title: string } | null>(null);
+  openMenuId = signal<number | null>(null);
 
   selectedType = '';
   selectedStatus = '';
@@ -705,8 +1080,8 @@ export class AchievementsComponent implements OnInit {
     this.showAddDialog.set(false);
   }
 
-  onAchievementAdded(request: AchievementCreateRequest): void {
-    this.achievementService.createAchievement(request).subscribe({
+  onAchievementAdded(data: { request: AchievementCreateRequest; file: File | null }): void {
+    this.achievementService.createAchievement(data.request, data.file || undefined).subscribe({
       next: (achievement) => {
         this.achievements.update(list => [achievement, ...list]);
         this.closeAddDialog();
@@ -733,15 +1108,19 @@ export class AchievementsComponent implements OnInit {
   }
 
   formatType(type: AchievementType): string {
-    return type.charAt(0) + type.slice(1).toLowerCase();
+    return type.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
   }
 
   getTypeBadgeVariant(type: AchievementType): 'primary' | 'success' | 'warning' | 'danger' {
     const variants: Record<string, 'primary' | 'success' | 'warning' | 'danger'> = {
-      'TOURNAMENT': 'primary',
-      'COMPETITION': 'success',
-      'CERTIFICATION': 'warning',
-      'MILESTONE': 'danger',
+      'TOURNAMENT_WIN': 'success',
+      'TOURNAMENT_RUNNER_UP': 'primary',
+      'MEDAL': 'warning',
+      'CERTIFICATE': 'primary',
+      'SKILL_MILESTONE': 'success',
+      'ATTENDANCE_AWARD': 'warning',
+      'IMPROVEMENT_AWARD': 'success',
+      'CHAMPIONSHIP': 'danger',
       'OTHER': 'primary'
     };
     return variants[type] || 'primary';
@@ -749,12 +1128,74 @@ export class AchievementsComponent implements OnInit {
 
   getTypeIcon(type: AchievementType): string {
     const icons: Record<string, string> = {
-      'TOURNAMENT': 'fa-solid fa-trophy',
-      'COMPETITION': 'fa-solid fa-medal',
-      'CERTIFICATION': 'fa-solid fa-certificate',
-      'MILESTONE': 'fa-solid fa-star',
+      'TOURNAMENT_WIN': 'fa-solid fa-trophy',
+      'TOURNAMENT_RUNNER_UP': 'fa-solid fa-medal',
+      'MEDAL': 'fa-solid fa-medal',
+      'CERTIFICATE': 'fa-solid fa-certificate',
+      'SKILL_MILESTONE': 'fa-solid fa-star',
+      'ATTENDANCE_AWARD': 'fa-solid fa-calendar-check',
+      'IMPROVEMENT_AWARD': 'fa-solid fa-chart-line',
+      'CHAMPIONSHIP': 'fa-solid fa-crown',
       'OTHER': 'fa-solid fa-award'
     };
     return icons[type] || 'fa-solid fa-award';
+  }
+
+  editAchievement(achievement: Achievement): void {
+    // TODO: Implement edit functionality
+    this.toastService.info('Edit functionality coming soon');
+  }
+
+  confirmDelete(achievement: Achievement): void {
+    this.achievementToDelete.set(achievement);
+    this.showDeleteDialog.set(true);
+  }
+
+  cancelDelete(): void {
+    this.showDeleteDialog.set(false);
+    this.achievementToDelete.set(null);
+  }
+
+  confirmDeleteAction(): void {
+    const achievement = this.achievementToDelete();
+    if (!achievement) return;
+
+    this.deleteAchievement(achievement);
+  }
+
+  deleteAchievement(achievement: Achievement): void {
+    this.achievementService.deleteAchievement(achievement.id!).subscribe({
+      next: () => {
+        this.cancelDelete();
+        this.toastService.success('Achievement deleted successfully');
+        this.loadAchievements();
+      },
+      error: (error) => {
+        console.error('Error deleting achievement:', error);
+        this.toastService.error('Failed to delete achievement');
+      }
+    });
+  }
+
+  openImageViewer(url: string, title: string): void {
+    this.viewedImage.set({ url, title });
+    this.showImageViewer.set(true);
+  }
+
+  closeImageViewer(): void {
+    this.showImageViewer.set(false);
+    this.viewedImage.set(null);
+  }
+
+  toggleMenu(achievementId: number): void {
+    if (this.openMenuId() === achievementId) {
+      this.openMenuId.set(null);
+    } else {
+      this.openMenuId.set(achievementId);
+    }
+  }
+
+  closeMenu(): void {
+    this.openMenuId.set(null);
   }
 }
