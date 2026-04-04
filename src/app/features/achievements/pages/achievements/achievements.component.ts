@@ -13,6 +13,8 @@ import { AvatarComponent } from '../../../../shared/components/avatar/avatar.com
 import { SkeletonLoaderComponent } from '../../../../shared/components/skeleton-loader/skeleton-loader.component';
 import { ModalComponent } from '../../../../shared/components/modal/modal.component';
 import { AddAchievementDialogComponent } from '../../components/add-achievement-dialog/add-achievement-dialog.component';
+import { ExportService } from '../../../../core/services/export.service';
+import { RateLimiterService } from '../../../../core/services/rate-limiter.service';
 
 @Component({
   selector: 'app-achievements',
@@ -38,16 +40,65 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
         </div>
         <div class="header-actions">
           @if (canManageAchievements()) {
-            <app-button
-              variant="primary"
-              icon="fa-solid fa-plus"
-              (clicked)="openAddDialog()"
-            >
-              Add Achievement
-            </app-button>
+            @if (bulkMode()) {
+              <span class="bulk-selected-count">{{ selectedCount() }} selected</span>
+              <app-button
+                variant="secondary"
+                icon="fa-solid fa-xmark"
+                (clicked)="toggleBulkMode()"
+              >
+                Cancel
+              </app-button>
+            } @else {
+              <app-button
+                variant="secondary"
+                icon="fa-solid fa-check-square"
+                (clicked)="toggleBulkMode()"
+              >
+                Bulk Select
+              </app-button>
+              <app-button
+                variant="secondary"
+                icon="fa-solid fa-download"
+                (clicked)="exportAll()"
+              >
+                Export All
+              </app-button>
+              <app-button
+                variant="primary"
+                icon="fa-solid fa-plus"
+                (clicked)="openAddDialog()"
+              >
+                Add Achievement
+              </app-button>
+            }
           }
         </div>
       </div>
+
+      <!-- Bulk Actions Bar -->
+      @if (bulkMode() && selectedCount() > 0) {
+        <div class="bulk-actions-bar">
+          <div class="bulk-info">
+            <i class="fa-solid fa-info-circle"></i>
+            <span>{{ selectedCount() }} achievement(s) selected</span>
+          </div>
+          <div class="bulk-actions">
+            <button class="bulk-action-btn verify" (click)="bulkVerify()">
+              <i class="fa-solid fa-check"></i>
+              Verify Selected
+            </button>
+            <button class="bulk-action-btn export" (click)="exportSelected()">
+              <i class="fa-solid fa-download"></i>
+              Export Selected
+            </button>
+            <button class="bulk-action-btn delete" (click)="bulkDelete()">
+              <i class="fa-solid fa-trash"></i>
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      }
 
       <!-- Filters -->
       <div class="filters-section">
@@ -60,6 +111,16 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
             (input)="onSearch($event)"
           />
         </div>
+        @if (bulkMode()) {
+          <label class="select-all-checkbox">
+            <input 
+              type="checkbox" 
+              [checked]="allSelected()"
+              (change)="toggleSelectAll()"
+            />
+            <span>Select All ({{ filteredAchievements().length }})</span>
+          </label>
+        }
         <div class="filter-group">
           <select [(ngModel)]="selectedType" (change)="applyFilters()" class="filter-select">
             <option value="">All Types</option>
@@ -130,7 +191,18 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       } @else {
         <div class="achievements-grid">
           @for (achievement of filteredAchievements(); track achievement.id) {
-            <div class="achievement-card" [class.verified]="achievement.isVerified">
+            <div class="achievement-card" [class.verified]="achievement.isVerified" [class.selected]="isSelected(achievement.id!)">
+              <!-- Bulk mode checkbox -->
+              @if (bulkMode()) {
+                <div class="bulk-checkbox" (click)="toggleSelection(achievement.id!)">
+                  <input 
+                    type="checkbox" 
+                    [checked]="isSelected(achievement.id!)"
+                    (click)="$event.stopPropagation()"
+                  />
+                </div>
+              }
+
               <!-- Instagram-style Header -->
               <div class="card-header">
                 <div class="header-left">
@@ -248,6 +320,32 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       </div>
     </app-modal>
 
+    <!-- Bulk Delete Confirmation Modal -->
+    <app-modal
+      [isOpen]="showBulkDeleteDialog()"
+      title=""
+      size="sm"
+      (close)="cancelBulkDelete()"
+    >
+      <div class="delete-dialog">
+        <div class="delete-dialog-icon">
+          <i class="fa-solid fa-trash"></i>
+        </div>
+        <h2>Delete Multiple Achievements?</h2>
+        <p class="delete-dialog-text">
+          You're about to delete <strong>{{ selectedCount() }} achievement(s)</strong>.
+          This action cannot be undone.
+        </p>
+        <div class="delete-dialog-actions">
+          <button class="btn-cancel" (click)="cancelBulkDelete()">Cancel</button>
+          <button class="btn-delete" (click)="confirmBulkDelete()">
+            <i class="fa-solid fa-trash"></i>
+            Delete All
+          </button>
+        </div>
+      </div>
+    </app-modal>
+
     <!-- Image Viewer Modal -->
     @if (showImageViewer()) {
       <div class="image-viewer-backdrop" (click)="closeImageViewer()">
@@ -292,11 +390,120 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       }
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .bulk-selected-count {
+        padding: 8px 16px;
+        background: var(--primary-light);
+        color: var(--primary-color);
+        border-radius: var(--border-radius-md);
+        font-weight: 600;
+        font-size: 14px;
+      }
+    }
+
+    .bulk-actions-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: var(--border-radius-lg);
+      color: white;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+      .bulk-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 600;
+
+        i {
+          font-size: 20px;
+        }
+      }
+
+      .bulk-actions {
+        display: flex;
+        gap: 12px;
+
+        .bulk-action-btn {
+          padding: 10px 20px;
+          border: none;
+          border-radius: var(--border-radius-md);
+          cursor: pointer;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.2s;
+
+          &.verify {
+            background: #10b981;
+            color: white;
+
+            &:hover {
+              background: #059669;
+            }
+          }
+
+          &.export {
+            background: #3b82f6;
+            color: white;
+
+            &:hover {
+              background: #2563eb;
+            }
+          }
+
+          &.delete {
+            background: #ef4444;
+            color: white;
+
+            &:hover {
+              background: #dc2626;
+            }
+          }
+        }
+      }
+    }
+
     .filters-section {
       display: flex;
       align-items: center;
       gap: 16px;
       flex-wrap: wrap;
+    }
+
+    .select-all-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--white);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-lg);
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+
+      &:hover {
+        background: var(--gray-50);
+      }
+
+      input[type="checkbox"] {
+        cursor: pointer;
+        width: 18px;
+        height: 18px;
+      }
+
+      span {
+        color: var(--text-primary);
+        font-size: 14px;
+      }
     }
 
     .search-box {
@@ -362,6 +569,7 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
       overflow: hidden;
       transition: all var(--transition-fast);
       width: 100%;
+      position: relative;
 
       &:hover {
         box-shadow: var(--shadow-md);
@@ -369,6 +577,31 @@ import { AddAchievementDialogComponent } from '../../components/add-achievement-
 
       &.verified {
         border-color: var(--success-color);
+      }
+
+      &.selected {
+        border-color: var(--primary-color);
+        border-width: 2px;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      .bulk-checkbox {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 10;
+        background: white;
+        padding: 4px;
+        border-radius: var(--border-radius-md);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+
+        input[type="checkbox"] {
+          cursor: pointer;
+          width: 20px;
+          height: 20px;
+          margin: 0;
+        }
       }
     }
 
@@ -989,6 +1222,8 @@ export class AchievementsComponent implements OnInit {
   private achievementService = inject(AchievementService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
+  private exportService = inject(ExportService);
+  private rateLimiter = inject(RateLimiterService);
 
   isLoading = signal(true);
   achievements = signal<Achievement[]>([]);
@@ -1000,8 +1235,19 @@ export class AchievementsComponent implements OnInit {
   viewedImage = signal<{ url: string; title: string } | null>(null);
   openMenuId = signal<number | null>(null);
 
+  // Bulk operations
+  bulkMode = signal(false);
+  selectedAchievements = signal<Set<number>>(new Set());
+  showBulkDeleteDialog = signal(false);
+
   selectedType = '';
   selectedStatus = '';
+
+  selectedCount = computed(() => this.selectedAchievements().size);
+  allSelected = computed(() => {
+    const filtered = this.filteredAchievements();
+    return filtered.length > 0 && filtered.every(a => this.selectedAchievements().has(a.id!));
+  });
 
   filteredAchievements = computed(() => {
     let filtered = this.achievements();
@@ -1197,5 +1443,126 @@ export class AchievementsComponent implements OnInit {
 
   closeMenu(): void {
     this.openMenuId.set(null);
+  }
+
+  // Bulk Operations
+  toggleBulkMode(): void {
+    this.bulkMode.update(v => !v);
+    if (!this.bulkMode()) {
+      this.selectedAchievements.set(new Set());
+    }
+  }
+
+  toggleSelection(id: number): void {
+    this.selectedAchievements.update(selected => {
+      const newSet = new Set(selected);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }
+
+  toggleSelectAll(): void {
+    const filtered = this.filteredAchievements();
+    if (this.allSelected()) {
+      this.selectedAchievements.set(new Set());
+    } else {
+      const allIds = new Set(filtered.map(a => a.id!));
+      this.selectedAchievements.set(allIds);
+    }
+  }
+
+  isSelected(id: number): boolean {
+    return this.selectedAchievements().has(id);
+  }
+
+  bulkDelete(): void {
+    if (this.selectedCount() === 0) {
+      this.toastService.warning('No achievements selected');
+      return;
+    }
+    this.showBulkDeleteDialog.set(true);
+  }
+
+  confirmBulkDelete(): void {
+    const ids = Array.from(this.selectedAchievements());
+    if (ids.length === 0) return;
+
+    // Rate limiting check
+    if (!this.rateLimiter.canPerformAction('bulk-delete', 3, 60000)) {
+      const remainingTime = Math.ceil(this.rateLimiter.getRemainingTime('bulk-delete', 60000) / 1000);
+      this.toastService.error(`Too many bulk delete attempts. Please wait ${remainingTime} seconds.`);
+      return;
+    }
+
+    this.achievementService.bulkDeleteAchievements(ids).subscribe({
+      next: () => {
+        this.showBulkDeleteDialog.set(false);
+        this.toastService.success(`Successfully deleted ${ids.length} achievement(s)`);
+        this.selectedAchievements.set(new Set());
+        this.loadAchievements();
+      },
+      error: (err: any) => {
+        console.error('Bulk delete error:', err);
+        this.toastService.error('Failed to delete achievements');
+      }
+    });
+  }
+
+  cancelBulkDelete(): void {
+    this.showBulkDeleteDialog.set(false);
+  }
+
+  bulkVerify(): void {
+    const ids = Array.from(this.selectedAchievements());
+    if (ids.length === 0) {
+      this.toastService.warning('No achievements selected');
+      return;
+    }
+
+    // Rate limiting check
+    if (!this.rateLimiter.canPerformAction('bulk-verify', 5, 60000)) {
+      const remainingTime = Math.ceil(this.rateLimiter.getRemainingTime('bulk-verify', 60000) / 1000);
+      this.toastService.error(`Too many bulk verify attempts. Please wait ${remainingTime} seconds.`);
+      return;
+    }
+
+    this.achievementService.bulkVerifyAchievements(ids, true).subscribe({
+      next: () => {
+        this.toastService.success(`Successfully verified ${ids.length} achievement(s)`);
+        this.selectedAchievements.set(new Set());
+        this.loadAchievements();
+      },
+      error: (err: any) => {
+        console.error('Bulk verify error:', err);
+        this.toastService.error('Failed to verify achievements');
+      }
+    });
+  }
+
+  exportSelected(): void {
+    const ids = Array.from(this.selectedAchievements());
+    if (ids.length === 0) {
+      this.toastService.warning('No achievements selected');
+      return;
+    }
+
+    const selected = this.achievements().filter(a => ids.includes(a.id!));
+    this.exportService.exportToCSV(selected, `achievements_${new Date().toISOString().split('T')[0]}.csv`);
+    this.toastService.success(`Exported ${ids.length} achievement(s)`);
+  }
+
+  exportAll(): void {
+    const filtered = this.filteredAchievements();
+    if (filtered.length === 0) {
+      this.toastService.warning('No achievements to export');
+      return;
+    }
+
+    this.exportService.exportToCSV(filtered, `all_achievements_${new Date().toISOString().split('T')[0]}.csv`);
+    this.toastService.success(`Exported ${filtered.length} achievement(s)`);
   }
 }

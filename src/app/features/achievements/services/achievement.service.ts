@@ -133,4 +133,23 @@ export class AchievementService {
       { ttl: this.cache.CACHE_DURATIONS.SHORT }
     );
   }
+
+  // Bulk operations
+  bulkDeleteAchievements(ids: number[]): Observable<void> {
+    return this.apiService.post<void>('/achievements/bulk-delete', { ids }).pipe(
+      map(response => {
+        this.cache.deleteByPrefix('GET:/achievements');
+        return response;
+      })
+    );
+  }
+
+  bulkVerifyAchievements(ids: number[], verified: boolean): Observable<void> {
+    return this.apiService.post<void>('/achievements/bulk-verify', { ids, verified }).pipe(
+      map(response => {
+        this.cache.deleteByPrefix('GET:/achievements');
+        return response;
+      })
+    );
+  }
 }
