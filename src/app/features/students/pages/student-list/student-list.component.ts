@@ -156,7 +156,7 @@ export class StudentListComponent implements OnInit {
     this.goToPage(this.activePage() - 1);
   }
 
-  confirmDelete(student: Student): void {
+  confirmDeactivate(student: Student): void {
     this.studentToDelete.set(student);
     this.showDeleteModal.set(true);
   }
@@ -166,26 +166,50 @@ export class StudentListComponent implements OnInit {
     this.studentToDelete.set(null);
   }
 
-  deleteStudent(): void {
+  deactivateStudent(): void {
     const student = this.studentToDelete();
     if (!student) return;
 
     this.isDeleting.set(true);
-    this.studentService.deleteStudent(student.id).subscribe({
+    this.studentService.deactivateStudent(student.id).subscribe({
       next: () => {
-        this.students.update(students => students.filter(s => s.id !== student.id));
-        if (this.currentPage() > this.totalPages()) {
-          this.currentPage.set(this.totalPages());
-        }
-        this.toastService.success('Student deleted successfully');
+        // Update local state - mark student as inactive instead of removing
+        this.students.update(students => 
+          students.map(s => s.id === student.id ? { ...s, isActive: false, status: 'INACTIVE' } : s)
+        );
+        this.toastService.success('Student deactivated successfully');
         this.closeDeleteModal();
         this.isDeleting.set(false);
       },
       error: () => {
-        this.toastService.error('Failed to delete student');
+        this.toastService.error('Failed to deactivate student');
         this.isDeleting.set(false);
       }
     });
+  }
+
+  activateStudent(student: Student): void {
+    this.studentService.activateStudent(student.id).subscribe({
+      next: () => {
+        // Update local state - mark student as active
+        this.students.update(students => 
+          students.map(s => s.id === student.id ? { ...s, isActive: true, status: 'ACTIVE' } : s)
+        );
+        this.toastService.success('Student activated successfully');
+      },
+      error: () => {
+        this.toastService.error('Failed to activate student');
+      }
+    });
+  }
+
+  // Keep for backwards compatibility
+  confirmDelete(student: Student): void {
+    this.confirmDeactivate(student);
+  }
+
+  deleteStudent(): void {
+    this.deactivateStudent();
   }
 
   formatSkillLevel(level: string): string {

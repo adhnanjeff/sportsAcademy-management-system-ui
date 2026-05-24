@@ -135,9 +135,15 @@
                     <a [routerLink]="[student.id, 'edit']" class="action-btn" title="Edit">
                       <i class="fa-solid fa-pen"></i>
                     </a>
-                    <button class="action-btn danger" title="Delete" (click)="confirmDelete(student)">
-                      <i class="fa-solid fa-trash"></i>
-                    </button>
+                    @if (student.isActive !== false) {
+                      <button class="action-btn warning" title="Deactivate" (click)="confirmDeactivate(student)">
+                        <i class="fa-solid fa-user-slash"></i>
+                      </button>
+                    } @else {
+                      <button class="action-btn success" title="Activate" (click)="activateStudent(student)">
+                        <i class="fa-solid fa-user-check"></i>
+                      </button>
+                    }
                   }
                 </div>
               </td>
@@ -196,15 +202,16 @@
   }
 </div>
 
-<!-- Delete Modal -->
+<!-- Deactivate Student Modal -->
 <app-modal
   [isOpen]="showDeleteModal()"
-  title="Delete Student"
+  title="Deactivate Student"
   (close)="closeDeleteModal()"
 >
-  <p>Are you sure you want to delete <strong>{{ studentToDelete()?.firstName }} {{ studentToDelete()?.lastName }}</strong>?</p>
+  <p>Are you sure you want to deactivate <strong>{{ studentToDelete()?.firstName }} {{ studentToDelete()?.lastName }}</strong>?</p>
+  <p class="modal-hint">The student will be marked as inactive but their data (attendance, payments, achievements) will be preserved. You can reactivate them later.</p>
   <div class="modal-actions" slot="footer">
     <app-button variant="outline" (clicked)="closeDeleteModal()">Cancel</app-button>
-    <app-button variant="danger" [loading]="isDeleting()" (clicked)="deleteStudent()">Delete</app-button>
+    <app-button variant="warning" [loading]="isDeleting()" (clicked)="deactivateStudent()">Deactivate</app-button>
   </div>
 </app-modal>

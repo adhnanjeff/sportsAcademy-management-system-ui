@@ -198,8 +198,27 @@ export class StudentService {
     );
   }
 
+  /**
+   * Soft delete - deactivates a student instead of hard delete
+   * Preserves attendance, payments, and other related data
+   */
+  deactivateStudent(id: number): Observable<void> {
+    return this.apiService.put<void>(`/students/${id}/deactivate`, {}, this.CACHE_PREFIX);
+  }
+
+  /**
+   * Reactivate a previously deactivated student
+   */
+  activateStudent(id: number): Observable<void> {
+    return this.apiService.put<void>(`/students/${id}/activate`, {}, this.CACHE_PREFIX);
+  }
+
+  /**
+   * @deprecated Use deactivateStudent() instead for soft delete
+   * Hard delete - permanently removes student and all related data
+   */
   deleteStudent(id: number): Observable<void> {
-    return this.apiService.delete(`/students/${id}`, this.CACHE_PREFIX);
+    return this.deactivateStudent(id); // Redirect to soft delete
   }
 
   assignToBatch(studentId: number, batchId: number): Observable<Student> {

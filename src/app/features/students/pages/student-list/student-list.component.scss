@@ -370,6 +370,22 @@
     background-color: var(--danger-light);
     color: var(--danger-color);
   }
+
+  &.warning:hover {
+    background-color: #fef3c7;
+    color: #d97706;
+  }
+
+  &.success:hover {
+    background-color: #d1fae5;
+    color: #059669;
+  }
+}
+
+.modal-hint {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-top: 8px;
 }
 
 .empty-row {
