@@ -45,18 +45,14 @@ import { ButtonComponent } from '../../../../shared/components/button/button.com
             </div>
 
             <div class="form-group span-4">
-              <label for="lastName">Last Name <span class="required">*</span></label>
+              <label for="lastName">Last Name</label>
               <input
                 id="lastName"
                 type="text"
                 formControlName="lastName"
-                placeholder="Enter last name"
+                placeholder="Enter last name (optional)"
                 class="form-input"
-                [class.error]="isFieldInvalid('lastName')"
               />
-              @if (isFieldInvalid('lastName')) {
-                <span class="error-text">Last name is required</span>
-              }
             </div>
 
             <div class="form-group span-4">
@@ -443,7 +439,7 @@ export class StudentFormComponent implements OnInit {
 
   form: FormGroup = this.fb.group({
     firstName: ['', Validators.required],
-    lastName: ['', Validators.required],
+    lastName: [''],
     nationalIdNumber: [''],
     phone: [''],
     dateOfBirth: [''],
