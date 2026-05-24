@@ -9,6 +9,7 @@ export interface Student {
   fullName?: string;
   phone?: string;
   phoneNumber?: string;
+  email?: string;
   photoUrl?: string;
   dateOfBirth?: string;
   nationalIdNumber?: string;
@@ -49,6 +50,7 @@ export interface StudentRequest {
   dateOfBirth?: string;
   nationalIdNumber?: string;
   phoneNumber?: string;
+  email?: string;
   photoUrl?: string;
   address?: string;
   city?: string;

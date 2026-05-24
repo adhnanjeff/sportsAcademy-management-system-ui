@@ -10,6 +10,7 @@ export interface CreateStudentRequest {
   lastName: string;
   nationalIdNumber?: string;
   phone?: string;
+  email?: string;
   dateOfBirth?: string;
   gender: Gender;
   skillLevel?: SkillLevel;
@@ -76,6 +77,7 @@ export class StudentService {
       gender: response.gender,
       phone: response.phoneNumber,
       phoneNumber: response.phoneNumber,
+      email: response.email,
       photoUrl: response.photoUrl,
       dateOfBirth: response.dateOfBirth,
       address: response.address,
@@ -151,6 +153,7 @@ export class StudentService {
       dateOfBirth: data.dateOfBirth || undefined,
       nationalIdNumber: data.nationalIdNumber || undefined,
       phoneNumber: data.phone || undefined,
+      email: data.email || undefined,
       photoUrl: data.photoUrl || undefined,
       address: data.address || undefined,
       city: data.city || undefined,
@@ -177,6 +180,7 @@ export class StudentService {
       dateOfBirth: data.dateOfBirth || undefined,
       nationalIdNumber: data.nationalIdNumber || undefined,
       phoneNumber: data.phone || undefined,
+      email: data.email || undefined,
       photoUrl: data.photoUrl || undefined,
       address: data.address || undefined,
       city: data.city || undefined,

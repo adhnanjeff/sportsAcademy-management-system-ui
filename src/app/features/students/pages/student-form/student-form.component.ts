@@ -77,6 +77,21 @@ import { ButtonComponent } from '../../../../shared/components/button/button.com
               />
             </div>
 
+            <div class="form-group span-4">
+              <label for="email">Email Address</label>
+              <input
+                id="email"
+                type="email"
+                formControlName="email"
+                placeholder="student@example.com (optional)"
+                class="form-input"
+                [class.error]="isFieldInvalid('email')"
+              />
+              @if (isFieldInvalid('email')) {
+                <span class="error-text">Please enter a valid email</span>
+              }
+            </div>
+
             <div class="form-group">
               <label for="dateOfBirth">Date of Birth</label>
               <input
@@ -442,6 +457,7 @@ export class StudentFormComponent implements OnInit {
     lastName: [''],
     nationalIdNumber: [''],
     phone: [''],
+    email: ['', Validators.email],
     dateOfBirth: [''],
     gender: ['', Validators.required],
     address: [''],
@@ -489,6 +505,7 @@ export class StudentFormComponent implements OnInit {
             lastName: student.lastName,
             nationalIdNumber: student.nationalIdNumber,
             phone: student.phone,
+            email: student.email || '',
             dateOfBirth: student.dateOfBirth,
             gender: student.gender,
             address: student.address,
