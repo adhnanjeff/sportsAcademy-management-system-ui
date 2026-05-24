@@ -168,7 +168,8 @@ export class AttendanceService {
   }
 
   getStudentsForBatch(batchId: number, date?: string): Observable<StudentAttendance[]> {
-    return this.apiService.get<StudentApiResponse[]>(`/students/batch/${batchId}`).pipe(
+    // Use active-only endpoint to exclude inactive students from attendance
+    return this.apiService.get<StudentApiResponse[]>(`/students/batch/${batchId}/active`).pipe(
       switchMap((students) => {
         const studentsBySchedule = date ? this.filterStudentsByDate(students, date) : students;
         const baseStudents: StudentAttendance[] = studentsBySchedule.map(student => ({
@@ -317,11 +318,12 @@ export class AttendanceService {
   }
 
   /**
-   * Get all students for a batch (without date filtering)
+   * Get all active students for a batch (without date filtering)
    * Used for adding makeup students who aren't scheduled for the current day
    */
   getAllStudentsForBatch(batchId: number): Observable<StudentAttendance[]> {
-    return this.apiService.get<StudentApiResponse[]>(`/students/batch/${batchId}`).pipe(
+    // Use active-only endpoint to exclude inactive students
+    return this.apiService.get<StudentApiResponse[]>(`/students/batch/${batchId}/active`).pipe(
       map(students => students.map(student => ({
         studentId: student.id,
         studentName: student.fullName || `${student.firstName} ${student.lastName}`,
