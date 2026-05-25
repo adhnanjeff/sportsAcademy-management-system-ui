@@ -289,6 +289,29 @@
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+
+    &.sortable {
+      cursor: pointer;
+      user-select: none;
+
+      &:hover {
+        color: var(--text-primary);
+        background-color: var(--gray-100);
+      }
+
+      .sort-icon {
+        margin-left: 6px;
+        opacity: 0.4;
+        font-size: 11px;
+        transition: opacity 0.15s;
+      }
+
+      &:hover .sort-icon,
+      &.active .sort-icon {
+        opacity: 1;
+      }
+    }
   }
 
   td {

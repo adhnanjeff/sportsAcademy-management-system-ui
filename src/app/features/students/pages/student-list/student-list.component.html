@@ -80,12 +80,37 @@
       <table class="students-table">
         <thead>
           <tr>
-            <th>Student</th>
+            <th class="sortable" (click)="sortBy('name')">
+              Student
+              <span class="sort-icon">
+                <i class="fa-solid" [class.fa-sort]="sortColumn() !== 'name'" [class.fa-sort-up]="sortColumn() === 'name' && sortDir() === 'asc'" [class.fa-sort-down]="sortColumn() === 'name' && sortDir() === 'desc'"></i>
+              </span>
+            </th>
             <th>Contact</th>
-            <th>Batch</th>
-            <th>Skill Level</th>
-            <th>Status</th>
-            <th>Join Date</th>
+            <th class="sortable" (click)="sortBy('batch')">
+              Batch
+              <span class="sort-icon">
+                <i class="fa-solid" [class.fa-sort]="sortColumn() !== 'batch'" [class.fa-sort-up]="sortColumn() === 'batch' && sortDir() === 'asc'" [class.fa-sort-down]="sortColumn() === 'batch' && sortDir() === 'desc'"></i>
+              </span>
+            </th>
+            <th class="sortable" (click)="sortBy('skillLevel')">
+              Skill Level
+              <span class="sort-icon">
+                <i class="fa-solid" [class.fa-sort]="sortColumn() !== 'skillLevel'" [class.fa-sort-up]="sortColumn() === 'skillLevel' && sortDir() === 'asc'" [class.fa-sort-down]="sortColumn() === 'skillLevel' && sortDir() === 'desc'"></i>
+              </span>
+            </th>
+            <th class="sortable" (click)="sortBy('status')">
+              Status
+              <span class="sort-icon">
+                <i class="fa-solid" [class.fa-sort]="sortColumn() !== 'status'" [class.fa-sort-up]="sortColumn() === 'status' && sortDir() === 'asc'" [class.fa-sort-down]="sortColumn() === 'status' && sortDir() === 'desc'"></i>
+              </span>
+            </th>
+            <th class="sortable" (click)="sortBy('joinDate')">
+              Join Date
+              <span class="sort-icon">
+                <i class="fa-solid" [class.fa-sort]="sortColumn() !== 'joinDate'" [class.fa-sort-up]="sortColumn() === 'joinDate' && sortDir() === 'asc'" [class.fa-sort-down]="sortColumn() === 'joinDate' && sortDir() === 'desc'"></i>
+              </span>
+            </th>
             <th>Actions</th>
           </tr>
         </thead>

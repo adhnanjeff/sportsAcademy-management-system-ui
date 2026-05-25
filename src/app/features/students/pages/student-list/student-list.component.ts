@@ -44,6 +44,8 @@ export class StudentListComponent implements OnInit {
   skeletonRows = computed(() => Array.from({ length: this.pageSize() }, (_, i) => i));
   showDeleteModal = signal(false);
   studentToDelete = signal<Student | null>(null);
+  sortColumn = signal<string>('');
+  sortDir = signal<'asc' | 'desc'>('asc');
 
   filteredStudents = computed(() => {
     let result = this.students();
@@ -66,6 +68,34 @@ export class StudentListComponent implements OnInit {
     const skill = this.skillFilter();
     if (skill !== 'all') {
       result = result.filter(s => s.skillLevel === skill);
+    }
+
+    const col = this.sortColumn();
+    if (col) {
+      const dir = this.sortDir() === 'asc' ? 1 : -1;
+      result = [...result].sort((a, b) => {
+        let valA: string | number = '';
+        let valB: string | number = '';
+        if (col === 'name') {
+          valA = (a.firstName + ' ' + (a.lastName || '')).toLowerCase();
+          valB = (b.firstName + ' ' + (b.lastName || '')).toLowerCase();
+        } else if (col === 'batch') {
+          valA = (a.batchName || '').toLowerCase();
+          valB = (b.batchName || '').toLowerCase();
+        } else if (col === 'skillLevel') {
+          valA = (a.skillLevel || '').toLowerCase();
+          valB = (b.skillLevel || '').toLowerCase();
+        } else if (col === 'status') {
+          valA = (a.status || '').toLowerCase();
+          valB = (b.status || '').toLowerCase();
+        } else if (col === 'joinDate') {
+          valA = a.joinDate ? new Date(a.joinDate).getTime() : 0;
+          valB = b.joinDate ? new Date(b.joinDate).getTime() : 0;
+        }
+        if (valA < valB) return -1 * dir;
+        if (valA > valB) return 1 * dir;
+        return 0;
+      });
     }
 
     return result;
@@ -115,6 +145,16 @@ export class StudentListComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  sortBy(col: string): void {
+    if (this.sortColumn() === col) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortColumn.set(col);
+      this.sortDir.set('asc');
+    }
+    this.currentPage.set(1);
   }
 
   onSearch(event: Event): void {
