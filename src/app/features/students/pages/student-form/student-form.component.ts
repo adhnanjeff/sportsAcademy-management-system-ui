@@ -556,7 +556,7 @@ export class StudentFormComponent implements OnInit {
     this.isSubmitting.set(true);
     const formValue = this.form.value as CreateStudentRequest;
     const selectedBatchId = this.toNumberOrNull(formValue.batchId);
-    const lastName = formValue.lastName.trim();
+    const lastName = (formValue.lastName || '').trim();
     const dateOfBirth = formValue.dateOfBirth || undefined;
     const daysOfWeek = formValue.daysOfWeek ?? [];
     const data: CreateStudentRequest = {
