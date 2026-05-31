@@ -53,8 +53,9 @@ export class StudentListComponent implements OnInit {
     const query = this.searchQuery().toLowerCase();
     if (query) {
       result = result.filter(s =>
-        s.firstName.toLowerCase().includes(query) ||
-        s.lastName.toLowerCase().includes(query) ||
+        s.firstName?.toLowerCase().includes(query) ||
+        s.lastName?.toLowerCase().includes(query) ||
+        s.fullName?.toLowerCase().includes(query) ||
         s.nationalIdNumber?.toLowerCase().includes(query) ||
         s.phone?.includes(query)
       );
