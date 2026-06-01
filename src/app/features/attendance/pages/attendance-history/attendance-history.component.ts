@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { forkJoin } from 'rxjs';
+import ExcelJS from 'exceljs';
 import {
   AttendanceApiResponse,
   AttendanceBatch,
@@ -782,7 +783,7 @@ export class AttendanceHistoryComponent implements OnInit {
     }
   }
 
-  exportAttendanceCsv(): void {
+  async exportAttendanceCsv(): Promise<void> {
     if (!this.canExport()) {
       this.toastService.info('No attendance data available to export');
       return;
@@ -790,22 +791,75 @@ export class AttendanceHistoryComponent implements OnInit {
 
     const columns = this.dateColumns();
     const records = this.filteredRows();
-    const header = ['Student', ...columns.map((column) => `${column.weekdayLabel} ${column.date}`)];
-    const csvRows = records.map((row) => [
-      row.studentName,
-      ...columns.map((column) => this.statusExportLabel(row.statuses[column.date]))
-    ]);
-
-    const csvContent = [header, ...csvRows]
-      .map((row) => row.map((value) => this.escapeCsvValue(value)).join(','))
-      .join('\n');
-
     const batchName = this.selectedBatchName();
-    const period = this.viewMode() === 'WEEKLY' ? 'weekly' : 'monthly';
+    const period = this.viewMode() === 'WEEKLY' ? 'Weekly' : 'Monthly';
     const generatedDate = new Date().toISOString().slice(0, 10);
-    const fileName = `attendance-${this.slugify(batchName)}-${period}-${generatedDate}.csv`;
+    const fileName = `Attendance Report ${batchName} ${period} ${generatedDate}.xlsx`;
 
-    this.downloadCsv(fileName, csvContent);
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Badminton Academy';
+    const sheet = workbook.addWorksheet('Attendance', { views: [{ state: 'frozen', xSplit: 1, ySplit: 1 }] });
+
+    // Header row
+    const headerRow = sheet.addRow(['Student', ...columns.map(c => `${c.weekdayLabel}\n${c.date}`)]);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
+    });
+    headerRow.height = 36;
+
+    // Student column width
+    sheet.getColumn(1).width = 28;
+    // Date columns width
+    for (let i = 2; i <= columns.length + 1; i++) {
+      sheet.getColumn(i).width = 10;
+    }
+
+    // Cell colors (ARGB)
+    const cellStyles: Record<string, { bg: string; fg: string }> = {
+      [AttendanceStatus.PRESENT]:  { bg: 'FFD1FAE5', fg: 'FF15803D' }, // soft green
+      [AttendanceStatus.ABSENT]:   { bg: 'FFFEE2E2', fg: 'FFB91C1C' }, // soft red
+      [AttendanceStatus.LATE]:     { bg: 'FFFFEDD5', fg: 'FFC2410C' }, // soft orange
+      [AttendanceStatus.EXCUSED]:  { bg: 'FFDBEAFE', fg: 'FF1D4ED8' }, // soft blue
+      NOT_MARKED:                  { bg: 'FFFEFCE8', fg: 'FFA16207' }, // soft yellow
+    };
+
+    // Data rows
+    records.forEach((row, rowIndex) => {
+      const values = [row.studentName, ...columns.map(c => this.statusCode(row.statuses[c.date]))];
+      const dataRow = sheet.addRow(values);
+      dataRow.height = 22;
+
+      dataRow.eachCell((cell, colNumber) => {
+        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'left' : 'center' };
+        cell.border = {
+          bottom: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+          right:  { style: 'hair', color: { argb: 'FFE2E8F0' } }
+        };
+        if (colNumber === 1) {
+          cell.font = { size: 10, color: { argb: 'FF1E293B' } };
+          cell.fill = { type: 'pattern', pattern: 'solid',
+            fgColor: { argb: rowIndex % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC' } };
+          return;
+        }
+        const status = row.statuses[columns[colNumber - 2].date];
+        const style = cellStyles[status] ?? cellStyles['NOT_MARKED'];
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: style.bg } };
+        cell.font  = { bold: true, size: 11, color: { argb: style.fg } };
+      });
+    });
+
+    // Download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
     this.toastService.success('Attendance report exported');
   }
 
@@ -856,14 +910,6 @@ export class AttendanceHistoryComponent implements OnInit {
     return '-';
   }
 
-  private statusExportLabel(status: CellStatus): string {
-    if (status === AttendanceStatus.PRESENT) return 'Present';
-    if (status === AttendanceStatus.ABSENT) return 'Absent';
-    if (status === AttendanceStatus.LATE) return 'Late';
-    if (status === AttendanceStatus.EXCUSED) return 'Excused';
-    return 'Not Marked';
-  }
-
   private selectedBatchName(): string {
     const selectedBatch = this.batches().find((batch) => String(batch.id) === this.selectedBatchId());
     return selectedBatch?.name || 'batch';
@@ -871,23 +917,6 @@ export class AttendanceHistoryComponent implements OnInit {
 
   private slugify(value: string): string {
     return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  }
-
-  private escapeCsvValue(value: string): string {
-    if (/[",\n]/.test(value)) {
-      return `"${value.replace(/"/g, '""')}"`;
-    }
-    return value;
-  }
-
-  private downloadCsv(fileName: string, content: string): void {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = fileName;
-    anchor.click();
-    URL.revokeObjectURL(url);
   }
 
   private loadMatrix(batchId: number, startDate: string, endDate: string, columns: DateColumn[]): void {
