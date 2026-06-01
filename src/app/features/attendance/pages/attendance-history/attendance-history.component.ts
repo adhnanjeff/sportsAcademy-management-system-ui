@@ -173,10 +173,8 @@ interface StudentMatrixRow {
                     <tr>
                       <td class="student-col">{{ row.studentName }}</td>
                       @for (column of dateColumns(); track column.date) {
-                        <td>
-                          <span class="status-badge" [class]="statusClass(row.statuses[column.date])">
-                            {{ statusCode(row.statuses[column.date]) }}
-                          </span>
+                        <td [class]="'cell-' + statusClass(row.statuses[column.date])">
+                          {{ statusCode(row.statuses[column.date]) }}
                         </td>
                       }
                     </tr>
@@ -566,6 +564,42 @@ interface StudentMatrixRow {
     .status-badge.not-marked {
       background: var(--gray-300);
       color: var(--text-secondary);
+    }
+
+    td.cell-present {
+      background-color: #dcfce7;
+      color: #15803d;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+    }
+    td.cell-absent {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+    }
+    td.cell-late {
+      background-color: #ffedd5;
+      color: #c2410c;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+    }
+    td.cell-excused {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+    }
+    td.cell-not-marked {
+      background-color: #fefce8;
+      color: #a16207;
+      font-weight: 500;
+      font-size: 14px;
+      text-align: center;
     }
 
     .empty-state {
